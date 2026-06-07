@@ -1,14 +1,14 @@
 /**
  * renderNav(activePage)
  * Prepends the site-wide navigation bar to <body>.
- * activePage: 'life-log' | 'fitness' | 'assets' | ''
+ * activePage: 'lifeLog' | 'fitness' | 'assets' | ''
  */
 export function renderNav(activePage) {
   const nav = document.createElement('div');
   nav.className = 'site-nav';
 
   const pages = [
-    { id: 'life-log', label: 'Life Log', href: '/life-log/' },
+    { id: 'lifeLog', label: 'Life Log', href: '/lifeLog/' },
     { id: 'fitness',  label: 'Fitness',  href: '/fitness/'  },
     { id: 'assets',   label: 'Assets',   href: '/assets/'   },
   ];

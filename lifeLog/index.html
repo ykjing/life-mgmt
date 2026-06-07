@@ -1112,7 +1112,7 @@ Object.assign(window, {
    ════════════════════════════════ */
 
 async function init() {
-  renderNav('life-log');
+  renderNav('lifeLog');
   document.getElementById('btnSignIn').addEventListener('click', () =>
     authSignIn(onSignedIn, () => showToast('Sign-in failed', 'Please try again.'))
   );
