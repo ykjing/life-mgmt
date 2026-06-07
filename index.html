@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Life</title>
+<link rel="stylesheet" href="shared/style.css">
+<style>
+.site-nav { position: sticky; top: 0; z-index: 10; }
+
+.hero {
+  padding: 64px 32px 40px;
+  text-align: center;
+}
+.hero h1 {
+  font-size: 48px; font-weight: 800; letter-spacing: 0.06em;
+  color: var(--accent); margin-bottom: 12px;
+}
+.hero p { font-size: 15px; color: var(--muted); max-width: 400px; margin: 0 auto; }
+
+.module-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 16px; padding: 0 32px 64px; max-width: 960px; margin: 0 auto;
+}
+.module-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 28px 24px;
+  text-decoration: none; color: var(--text);
+  transition: border-color 0.15s, transform 0.15s;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.module-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+.module-card.coming-soon { opacity: 0.5; cursor: default; pointer-events: none; }
+.module-card h2 { font-size: 18px; font-weight: 700; }
+.module-card p { font-size: 13px; color: var(--muted); line-height: 1.65; flex: 1; }
+.module-card .badge {
+  font-size: 11px; color: var(--muted); border: 1px solid var(--border);
+  border-radius: 4px; padding: 2px 8px; align-self: flex-start;
+}
+.module-icon { font-size: 28px; margin-bottom: 4px; }
+
+@media (max-width: 600px) {
+  .hero { padding: 40px 20px 28px; }
+  .hero h1 { font-size: 36px; }
+  .module-grid { grid-template-columns: 1fr; padding: 0 20px 40px; }
+}
+</style>
+</head>
+<body>
+
+<div class="site-nav">
+  <a class="site-nav-brand" href="/">Life</a>
+  <div class="site-nav-links">
+    <a href="/life-log/">Life Log</a>
+    <a href="/fitness/">Fitness</a>
+    <a href="/assets/">Assets</a>
+  </div>
+</div>
+
+<div class="hero">
+  <h1>Life</h1>
+  <p>Your personal management hub — log, train, and track what matters.</p>
+</div>
+
+<div class="module-grid">
+  <a class="module-card" href="/life-log/">
+    <div class="module-icon">📓</div>
+    <h2>Life Log</h2>
+    <p>Record daily moments, actions, insights, feelings, and habits. Review your year at a glance.</p>
+  </a>
+
+  <div class="module-card coming-soon">
+    <div class="module-icon">🏋️</div>
+    <h2>Fitness</h2>
+    <p>Exercise analysis, training load tracking, and competition planning.</p>
+    <span class="badge">Coming soon</span>
+  </div>
+
+  <div class="module-card coming-soon">
+    <div class="module-icon">📊</div>
+    <h2>Assets</h2>
+    <p>Asset management, portfolio tracking, and financial overview.</p>
+    <span class="badge">Coming soon</span>
+  </div>
+</div>
+
+</body>
+</html>

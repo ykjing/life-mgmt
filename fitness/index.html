@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fitness — Life</title>
+<link rel="stylesheet" href="../shared/style.css">
+<style>
+.placeholder {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  min-height: 60vh; gap: 16px; color: var(--muted); text-align: center; padding: 32px;
+}
+.placeholder h1 { font-size: 32px; font-weight: 800; color: var(--text); }
+.placeholder p { font-size: 14px; line-height: 1.7; max-width: 360px; }
+</style>
+</head>
+<body>
+
+<script type="module">
+import { renderNav } from '../shared/nav.js';
+renderNav('fitness');
+</script>
+
+<div class="placeholder">
+  <div style="font-size:48px">🏋️</div>
+  <h1>Fitness</h1>
+  <p>Exercise analysis, training load tracking, and competition planning — coming soon.</p>
+  <a href="/" class="btn">Back to Home</a>
+</div>
+
+</body>
+</html>
