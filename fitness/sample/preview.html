@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Fitness Preview</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f0f11;--bg2:#18181b;--bg3:#27272a;
+  --fg:#f4f4f5;--fg2:#a1a1aa;--border:#3f3f46;
+  --cb:#f97316;--cr:#4b5563;--ci:#ef4444;
+  --cs:#8b5cf6;--ce:#10b981;--cl:#3b82f6;--crace:#f59e0b;
+}
+body{background:var(--bg);color:var(--fg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px}
+.site-nav{display:flex;align-items:center;gap:1.5rem;padding:.6rem 1.25rem;border-bottom:1px solid var(--border);background:var(--bg)}
+.site-nav-brand{font-weight:700;font-size:1rem;color:var(--fg);text-decoration:none}
+.site-nav-links{display:flex;gap:1.25rem}
+.site-nav-links a{text-decoration:none;color:var(--fg2);font-size:.85rem}
+.site-nav-links a.active{color:var(--fg);font-weight:600}
+.view-tabs{display:flex;border-bottom:1px solid var(--border);background:var(--bg)}
+.view-tab{padding:.5rem 1.25rem;font-size:.85rem;cursor:pointer;border:none;background:none;color:var(--fg2);border-bottom:2px solid transparent;margin-bottom:-1px;font-family:inherit}
+.view-tab.active{color:var(--fg);border-bottom-color:var(--cl)}
+#stats-bar{display:flex;align-items:center;gap:1.5rem;padding:.45rem 1.25rem;background:var(--bg2);border-bottom:1px solid var(--border);font-size:.75rem;color:var(--fg2);flex-wrap:wrap}
+.stat{display:flex;flex-direction:column;align-items:center;min-width:56px}
+.stat-val{font-size:1rem;font-weight:700;color:var(--fg)}
+#race-cntdwn{margin-left:auto;color:var(--crace);font-weight:700;font-size:.82rem}
+#main{padding:1rem 1.25rem;max-width:920px;margin:0 auto}
+.lsd-box{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:.85rem 1.1rem;margin-bottom:1.1rem}
+.lsd-box h3{font-size:.7rem;text-transform:uppercase;letter-spacing:.07em;color:var(--fg2);margin:0 0 .7rem}
+.lsd-dots{display:flex;align-items:flex-end;gap:.5rem}
+.lsd-dot{flex:1;display:flex;flex-direction:column;align-items:center;gap:.2rem;cursor:pointer}
+.lsd-bar-area{width:100%;height:70px;display:flex;align-items:flex-end}
+.lsd-bar{width:100%;border-radius:4px 4px 0 0;background:var(--border);position:relative}
+.lsd-bar.done{background:var(--ce)}
+.lsd-bar.current{background:var(--cl)}
+.lsd-bar.recovery{background:var(--ce);opacity:.7}
+.lsd-bar.peak{background:var(--crace)}
+.lsd-bar.taper{background:var(--cs)}
+.lsd-bar.future{background:var(--border)}
+.lsd-km{font-size:.72rem;font-weight:700;color:var(--fg)}
+.lsd-wlabel{font-size:.6rem;color:var(--fg2)}
+.lsd-actual-km{font-size:.62rem;color:var(--ce);font-weight:700}
+.week-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;margin-bottom:.6rem;overflow:hidden}
+.week-card.cur{border-color:var(--cl)}
+.wk-hdr{display:flex;align-items:center;gap:.6rem;padding:.55rem .9rem;cursor:pointer;user-select:none}
+.wk-hdr:hover{background:var(--bg3)}
+.wk-title{font-weight:700;font-size:.88rem}
+.wk-dates{font-size:.7rem;color:var(--fg2)}
+.wk-phase{font-size:.65rem;padding:.12rem .45rem;border-radius:999px;margin-left:auto}
+.ph-build{background:rgba(59,130,246,.15);color:var(--cl)}
+.ph-recovery{background:rgba(16,185,129,.15);color:var(--ce)}
+.ph-peak{background:rgba(245,158,11,.15);color:var(--crace)}
+.ph-taper{background:rgba(139,92,246,.15);color:var(--cs)}
+.ph-race{background:rgba(245,158,11,.25);color:var(--crace)}
+.wk-lsd-tag{font-size:.7rem;color:var(--fg2)}
+.wk-chev{color:var(--fg2);font-size:.8rem;transition:transform .2s}
+.week-card.open .wk-chev{transform:rotate(90deg)}
+.wk-body{display:none;padding:.1rem .65rem .65rem}
+.week-card.open .wk-body{display:block}
+.wk-note{font-size:.72rem;color:var(--crace);background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);border-radius:5px;padding:.3rem .55rem;margin-bottom:.5rem}
+.day-hdr-row{display:grid;grid-template-columns:repeat(7,1fr);gap:.45rem;margin-bottom:.25rem}
+.day-hdr{text-align:center;font-size:.62rem;color:var(--fg2)}
+.day-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:.45rem}
+.dc{background:var(--bg3);border:1px solid transparent;border-radius:8px;padding:.45rem .35rem;min-height:78px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:.18rem;text-align:center}
+.dc.today{border-color:var(--cl);background:rgba(59,130,246,.07)}
+.dc.has-entry{border-color:rgba(34,197,94,.4)}
+.dc-date{font-size:.62rem;color:var(--fg2)}
+.dc-icon{font-size:1.15rem}
+.dc-label{font-size:.58rem;color:var(--fg2);line-height:1.2;width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dc-badge{font-size:.57rem;padding:.05rem .28rem;border-radius:999px;background:rgba(34,197,94,.18);color:var(--ce)}
+.dc-actual{font-size:.62rem;font-weight:600;color:var(--ce)}
+.dc-bar{width:75%;height:3px;border-radius:2px;margin-top:auto}
+.dc.type-badminton .dc-bar{background:var(--cb)}
+.dc.type-rest .dc-bar{background:var(--cr)}
+.dc.type-intervals .dc-bar{background:var(--ci)}
+.dc.type-strength .dc-bar{background:var(--cs)}
+.dc.type-easy .dc-bar{background:var(--ce)}
+.dc.type-lsd .dc-bar{background:var(--cl)}
+.dc.type-race .dc-bar{background:var(--crace)}
+.metric-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:.65rem;margin-bottom:1.1rem}
+.mc{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:.7rem .9rem}
+.mc-lbl{font-size:.65rem;color:var(--fg2)}
+.mc-val{font-size:1.3rem;font-weight:700}
+.mc-unit{font-size:.65rem;color:var(--fg2)}
+.chart-box{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:.9rem 1.1rem;margin-bottom:.8rem}
+.chart-box h3{font-size:.72rem;color:var(--fg2);margin:0 0 .65rem;text-transform:uppercase;letter-spacing:.06em}
+.chart-box svg{display:block;width:100%;overflow:visible}
+</style>
+</head>
+<body>
+<div class="site-nav">
+  <a class="site-nav-brand" href="#">Life</a>
+  <div class="site-nav-links">
+    <a href="#">Life Log</a><a href="#" class="active">Fitness</a><a href="#">Assets</a>
+  </div>
+</div>
+<div class="view-tabs">
+  <button class="view-tab active" data-v="plan"   onclick="switchView('plan')">備賽計畫</button>
+  <button class="view-tab"        data-v="trends" onclick="switchView('trends')">趨勢分析</button>
+</div>
+<div id="stats-bar">
+  <div class="stat"><span class="stat-val">360</span><span>本週負荷</span></div>
+  <div class="stat"><span class="stat-val">0.82</span><span>ACWR</span></div>
+  <div class="stat"><span class="stat-val">2</span><span>本週次數</span></div>
+  <div id="race-cntdwn">🏆 <span id="cd">—</span> 天後・半馬 8/2</div>
+</div>
+<div id="main">
+  <div id="v-plan">
+    <div class="lsd-box"><h3>LSD 長跑進程</h3><div class="lsd-dots" id="lsd-dots"></div></div>
+    <div id="weeks"></div>
+  </div>
+  <div id="v-trends" style="display:none">
+    <div class="metric-cards">
+      <div class="mc"><div class="mc-lbl">步頻</div><div class="mc-val">146<span class="mc-unit"> spm</span></div><div style="font-size:.65rem;color:var(--ce)">+2 較上次</div></div>
+      <div class="mc"><div class="mc-lbl">步幅</div><div class="mc-val">93<span class="mc-unit"> cm</span></div><div style="font-size:.65rem;color:var(--ce)">+5</div></div>
+      <div class="mc"><div class="mc-lbl">平均心率</div><div class="mc-val">152<span class="mc-unit"> bpm</span></div></div>
+      <div class="mc"><div class="mc-lbl">垂直振幅</div><div class="mc-val">8.2<span class="mc-unit"> cm</span></div><div style="font-size:.65rem;color:var(--ce)">優秀 &lt;10%</div></div>
+      <div class="mc"><div class="mc-lbl">觸地時間</div><div class="mc-val">264<span class="mc-unit"> ms</span></div></div>
+      <div class="mc"><div class="mc-lbl">上次距離</div><div class="mc-val">5.01<span class="mc-unit"> km</span></div></div>
+    </div>
+    <div class="chart-box"><h3>週負荷趨勢（近12週）</h3><div id="ch-load"></div></div>
+    <div class="chart-box"><h3>步頻趨勢（近10次跑步）</h3><div id="ch-cad"></div></div>
+  </div>
+</div>
+<script>
+const DATA={
+  '2026-06-15':[{type:'badminton',duration:90,rpe:6,load:540,status:'done',note:'',metrics:{}}],
+  '2026-06-17':[{type:'intervals',duration:45,rpe:8,load:360,status:'done',
+    note:'4趟1km 5:49/6:03/6:00/5:50',
+    metrics:{distance:5.01,avgPace:'5:58',avgHR:152,avgCadence:146,avgStrideLength:93,avgVerticalOscillation:8.2,avgGroundContactTime:264}}],
+  '2026-06-18':[{type:'strength',duration:25,rpe:6,load:150,status:'done',note:'',metrics:{strengthDone:['row','press','shoulder','plank']}}],
+};
+const DEF=[
+  {offset:0,type:'badminton',label:'羽球',      note:'1-2小時羽球'},
+  {offset:1,type:'rest',     label:'休息',      note:'完全休息'},
+  {offset:2,type:'intervals',label:'間歇+腿訓', note:'1km×4趟 配速6:45\n下肢重訓25分'},
+  {offset:3,type:'strength', label:'上肢+核心', note:'划船/胸推/肩推\n棒式撐體'},
+  {offset:4,type:'easy',     label:'輕鬆跑',    note:'5-6km 7:15-7:30配速'},
+  {offset:5,type:'rest',     label:'大充電',    note:'長跑前大休息\n多補水與碳水'},
+  {offset:6,type:'lsd',      label:'LSD',       note:''},
+];
+const PLAN={raceDate:'2026-08-02',weeks:[
+  {id:'w1',label:'第1週',start:'2026-06-15',lsdKm:11.3,phase:'build',   lsdNote:'跑走法、低心率'},
+  {id:'w2',label:'第2週',start:'2026-06-22',lsdKm:12.6,phase:'build',   lsdNote:'練習補水/能量膠',
+   note:'⚠️ 腸胃鏡週（6/25週四）週一停羽球，低渣飲食6/22–6/24',
+   days:[
+     {offset:0,type:'rest',     label:'停練',       note:'羽球停練 低渣飲食Day1'},
+     {offset:1,type:'intervals',label:'間歇(降載)', note:'1km×4 嚴守6:45\n下肢重訓重量減半'},
+     {offset:2,type:'rest',     label:'完全休息',   note:'低渣Day3 傍晚清腸'},
+     {offset:3,type:'strength', label:'鏡檢+上肢',  note:'🏥腸胃鏡\n晚上：上肢+核心'},
+     {offset:4,type:'easy',     label:'輕鬆跑',     note:'5-6km 7:15-7:30配速'},
+     {offset:5,type:'rest',     label:'大充電',     note:'長跑前大休息+碳水'},
+     {offset:6,type:'lsd',      label:'LSD 12.6km', note:'練習補水/能量膠'},
+   ]},
+  {id:'w3',label:'第3週',start:'2026-06-29',lsdKm:14.0,phase:'build',   lsdNote:'中高里程體感建立'},
+  {id:'w4',label:'第4週',start:'2026-07-06',lsdKm:12.0,phase:'recovery',lsdNote:'主動縮短、修復關節'},
+  {id:'w5',label:'第5週',start:'2026-07-13',lsdKm:16.6,phase:'peak',    lsdNote:'生涯最高峰、信心解鎖'},
+  {id:'w6',label:'第6週',start:'2026-07-20',lsdKm:8.0, phase:'taper',   lsdNote:'超級減量、保留體力',
+   days:[
+     {offset:0,type:'badminton',label:'羽球',       note:'1-2小時羽球'},
+     {offset:1,type:'rest',     label:'休息',       note:'完全休息'},
+     {offset:2,type:'intervals',label:'間歇(輕量)', note:'1km×3趟輕鬆跑\n下肢極輕量維持'},
+     {offset:3,type:'strength', label:'上肢+核心',  note:'划船/胸推/肩推+棒式'},
+     {offset:4,type:'easy',     label:'輕鬆跑',     note:'4-5km 7:15-7:30配速'},
+     {offset:5,type:'rest',     label:'大充電',     note:'長跑前大休息+碳水'},
+     {offset:6,type:'lsd',      label:'LSD 8.0km',  note:'超級減量'},
+   ]},
+  {id:'race',label:'賽前週',start:'2026-07-27',lsdKm:null,phase:'race',
+   days:[
+     {offset:0,type:'badminton',label:'羽球(輕)',   note:'1小時輕鬆打不拼球'},
+     {offset:1,type:'rest',     label:'休息',       note:'完全休息'},
+     {offset:2,type:'easy',     label:'輕鬆動',     note:'3km輕鬆動動'},
+     {offset:3,type:'rest',     label:'拉筋',       note:'賽前大拉筋伸展'},
+     {offset:4,type:'rest',     label:'休息',       note:'完全休息'},
+     {offset:5,type:'rest',     label:'休息',       note:'完全休息'},
+     {offset:6,type:'race',     label:'🏆 半馬正賽',note:'8/2 半馬\n目標2:30:00'},
+   ]},
+]};
+
+function todayStr(){return new Date().toISOString().slice(0,10);}
+function addD(s,n){const d=new Date(s+'T00:00:00');d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);}
+function weekDays(w){return w.days||DEF.map(d=>({...d,label:d.type==='lsd'?`LSD ${w.lsdKm}km`:d.label,note:d.type==='lsd'?w.lsdNote:d.note}));}
+const icons={badminton:'🏸',rest:'💤',intervals:'🏃',strength:'💪',easy:'🚶',lsd:'🏁',race:'🏆'};
+const phLbl={build:'累積期',recovery:'修復週',peak:'高峰週',taper:'減量期',race:'賽週'};
+const DOW=['一','二','三','四','五','六','日'];
+
+document.getElementById('cd').textContent=Math.ceil((new Date(PLAN.raceDate)-new Date())/86400000);
+
+// LSD
+(()=>{
+  const tod=todayStr(),lsdW=PLAN.weeks.filter(w=>w.lsdKm),max=Math.max(...lsdW.map(w=>w.lsdKm));
+  document.getElementById('lsd-dots').innerHTML=lsdW.map(w=>{
+    const ld=addD(w.start,6),isPast=ld<tod,isCur=tod>=w.start&&tod<=ld;
+    const entry=(DATA[ld]||[]).find(e=>e.type==='lsd');
+    const actual=entry?.metrics?.distance;
+    const cls=isPast?(actual?'done':'future'):isCur?'current':w.phase;
+    return `<div class="lsd-dot"><div class="lsd-bar-area"><div class="lsd-bar ${cls}" style="height:${(w.lsdKm/max)*100}%">
+      ${actual?`<span style="position:absolute;top:-1rem;left:0;right:0;text-align:center;font-size:.55rem;color:var(--ce)">✓</span>`:''}
+    </div></div><div class="lsd-km">${w.lsdKm}</div><div class="lsd-wlabel">${w.label}</div>${actual?`<div class="lsd-actual-km">${actual}km</div>`:''}</div>`;
+  }).join('');
+})();
+
+// Plan
+(()=>{
+  const tod=todayStr();
+  document.getElementById('weeks').innerHTML=PLAN.weeks.map(w=>{
+    const days=weekDays(w),isCur=tod>=w.start&&tod<=addD(w.start,6),isPast=addD(w.start,6)<tod;
+    const cells=days.map(d=>{
+      const ds=addD(w.start,d.offset),entry=(DATA[ds]||[]).find(e=>e.status!=='skip'),isToday=ds===tod;
+      const hasDist=entry?.metrics?.distance,hasDur=entry?.duration;
+      return `<div class="dc type-${d.type}${isToday?' today':''}${entry?' has-entry':''}">
+        <span class="dc-date">${ds.slice(5)}</span>
+        <span class="dc-icon">${icons[d.type]||'📋'}</span>
+        <span class="dc-label">${d.label}</span>
+        ${entry?`<span class="dc-badge">✓</span>`:''}
+        ${entry&&hasDist?`<span class="dc-actual">${entry.metrics.distance}km</span>`:entry&&hasDur?`<span class="dc-actual">${entry.duration}'</span>`:''}
+        <div class="dc-bar"></div>
+      </div>`;
+    }).join('');
+    return `<div class="week-card ${isCur?'cur':''} ${isCur||isPast?'open':''}" id="wc-${w.id}">
+      <div class="wk-hdr" onclick="document.getElementById('wc-${w.id}').classList.toggle('open')">
+        <span class="wk-title">${w.label}</span>
+        <span class="wk-dates">${w.start} – ${addD(w.start,6)}</span>
+        <span class="wk-phase ph-${w.phase}">${phLbl[w.phase]}</span>
+        ${w.lsdKm?`<span class="wk-lsd-tag">LSD ${w.lsdKm}km</span>`:''}
+        <span class="wk-chev">›</span>
+      </div>
+      <div class="wk-body">
+        ${w.note?`<div class="wk-note">${w.note}</div>`:''}
+        <div class="day-hdr-row">${DOW.map(h=>`<div class="day-hdr">${h}</div>`).join('')}</div>
+        <div class="day-grid">${cells}</div>
+      </div>
+    </div>`;
+  }).join('');
+})();
+
+// Charts
+function barChart(lbls,vals,{color,ref,refLbl}={}){
+  const W=580,H=110,n=lbls.length;if(!n)return '';
+  const max=Math.max(...vals,1),bw=Math.max(4,Math.floor((W-20)/n)-5);
+  const bars=lbls.map((l,i)=>{const bh=(vals[i]/max)*H,x=10+i*((W-20)/n);
+    return `<rect x="${x}" y="${H-bh}" width="${bw}" height="${bh}" fill="${color}" rx="2" opacity=".82"/>
+      <text x="${x+bw/2}" y="${H+13}" text-anchor="middle" font-size="8" fill="var(--fg2)">${l}</text>
+      ${vals[i]>0?`<text x="${x+bw/2}" y="${H-bh-3}" text-anchor="middle" font-size="8" fill="var(--fg)">${vals[i]}</text>`:''}`
+  }).join('');
+  const rl=ref?`<line x1="10" y1="${H-(ref/max)*H}" x2="${W-10}" y2="${H-(ref/max)*H}" stroke="var(--crace)" stroke-dasharray="4 3" stroke-width="1"/><text x="${W-10}" y="${H-(ref/max)*H-4}" text-anchor="end" font-size="8" fill="var(--crace)">${refLbl}</text>`:'';
+  return `<svg viewBox="0 0 ${W} ${H+18}">${bars}${rl}</svg>`;
+}
+document.getElementById('ch-load').innerHTML=barChart(['5/19','5/26','6/2','6/9','6/16'],[0,120,480,320,360],{color:'var(--cl)'});
+document.getElementById('ch-cad').innerHTML=barChart(['6/02','6/05','6/07','6/11','6/14','6/17'],[140,138,146,136,142,146],{color:'var(--ce)',ref:170,refLbl:'170spm'});
+
+function switchView(v){
+  document.querySelectorAll('.view-tab').forEach(t=>t.classList.toggle('active',t.dataset.v===v));
+  document.getElementById('v-plan').style.display=v==='plan'?'':'none';
+  document.getElementById('v-trends').style.display=v==='trends'?'':'none';
+}
+</script>
+</body>
+</html>
