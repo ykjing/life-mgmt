@@ -717,14 +717,15 @@ async function delEntry() {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-function todayStr() { return new Date().toISOString().slice(0,10); }
-function toKey(d)   { return d.toISOString().slice(0,10); }
-function p2(n)      { return String(n).padStart(2,'0'); }
+function p2(n) { return String(n).padStart(2,'0'); }
+function fmtDate(d) { return `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`; }
+function todayStr() { return fmtDate(new Date()); }
+function toKey(d)   { return fmtDate(d); }
 
 function addD(dateStr, n) {
   const d = new Date(dateStr + 'T00:00:00');
   d.setDate(d.getDate() + n);
-  return d.toISOString().slice(0,10);
+  return fmtDate(d);
 }
 
 function weekMonday(d) {

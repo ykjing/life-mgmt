@@ -178,8 +178,10 @@ const PLAN={raceDate:'2026-08-02',weeks:[
    ]},
 ]};
 
-function todayStr(){return new Date().toISOString().slice(0,10);}
-function addD(s,n){const d=new Date(s+'T00:00:00');d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);}
+function p2(n){return String(n).padStart(2,'0');}
+function fmtDate(d){return `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`;}
+function todayStr(){return fmtDate(new Date());}
+function addD(s,n){const d=new Date(s+'T00:00:00');d.setDate(d.getDate()+n);return fmtDate(d);}
 function weekDays(w){return w.days||DEF.map(d=>({...d,label:d.type==='lsd'?`LSD ${w.lsdKm}km`:d.label,note:d.type==='lsd'?w.lsdNote:d.note}));}
 const icons={badminton:'🏸',rest:'💤',intervals:'🏃',strength:'💪',easy:'🚶',lsd:'🏁',race:'🏆'};
 const phLbl={build:'累積期',recovery:'修復週',peak:'高峰週',taper:'減量期',race:'賽週'};
