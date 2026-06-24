@@ -116,12 +116,12 @@
 .chart-box svg { display:block; width:100%; overflow:visible; }
 
 /* ── Panel ── */
-#ov { position:fixed; inset:0; background:rgba(0,0,0,.72); backdrop-filter:blur(3px); z-index:199; display:none; }
+#ov { position:fixed; inset:0; background:rgba(0,0,0,.82); backdrop-filter:blur(4px); z-index:900; display:none; }
 #ov.open { display:block; }
 #panel {
   position:fixed; right:0; top:0; bottom:0; width:min(460px,100vw);
   background:var(--bg2); border-left:1px solid var(--border);
-  transform:translateX(100%); transition:transform .25s; z-index:200; display:flex; flex-direction:column;
+  transform:translateX(100%); transition:transform .25s; z-index:901; display:flex; flex-direction:column;
 }
 #panel.open { transform:none; }
 #phdr { display:flex; align-items:center; gap:.5rem; padding:.7rem .95rem; border-bottom:1px solid var(--border); }
@@ -642,11 +642,13 @@ function openPanel(dateStr) {
 
   document.getElementById('panel').classList.add('open');
   document.getElementById('ov').classList.add('open');
+  document.body.style.overflow = 'hidden';
 }
 
 function closePanel() {
   document.getElementById('panel').classList.remove('open');
   document.getElementById('ov').classList.remove('open');
+  document.body.style.overflow = '';
   pDate = null;
 }
 
