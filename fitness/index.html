@@ -172,6 +172,29 @@ details.coll[open] summary::before { content:'▼'; }
 .ex-sets { font-size:.65rem; color:var(--fg2); margin-left:auto; }
 .plan-hint { font-size:.68rem; color:var(--fg2); background:var(--bg3); border-radius:6px; padding:.4rem .55rem; margin-top:.5rem; line-height:1.5; }
 
+/* ── Import modal ── */
+#imp-ov{position:fixed;inset:0;background:rgba(0,0,0,.82);backdrop-filter:blur(4px);z-index:902;display:none}
+#imp-ov.open{display:block}
+#imp-modal{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg2);border:1px solid var(--border);border-radius:12px;width:min(660px,96vw);max-height:82vh;display:none;flex-direction:column;z-index:903}
+#imp-modal.open{display:flex}
+#imp-hdr{display:flex;align-items:center;padding:.7rem 1rem;border-bottom:1px solid var(--border);font-weight:700;font-size:.9rem;gap:.5rem}
+#imp-hdr button{margin-left:auto;background:none;border:none;color:var(--fg2);font-size:1.1rem;cursor:pointer;padding:.1rem .3rem}
+#imp-body{flex:1;overflow-y:auto;padding:1rem}
+#imp-ftr{display:none;flex-wrap:wrap;gap:.5rem;align-items:center;padding:.65rem 1rem;border-top:1px solid var(--border)}
+#imp-count{font-size:.72rem;color:var(--fg2);margin-left:auto}
+.imp-drop{display:flex;flex-direction:column;align-items:center;gap:.35rem;border:2px dashed var(--border);border-radius:8px;padding:1.75rem 1rem;cursor:pointer;text-align:center;font-size:.82rem;color:var(--fg2);transition:border-color .15s}
+.imp-drop:hover,.imp-drop:focus-within{border-color:var(--cl)}
+.imp-drop input[type=file]{display:none}
+.imp-ico{font-size:2rem}
+.imp-sub{font-size:.7rem;margin-top:.1rem}
+.import-btn{padding:.18rem .6rem;border-radius:5px;background:var(--bg3);border:1px solid var(--border);color:var(--fg2);cursor:pointer;font-size:.72rem;font-family:inherit;transition:border-color .15s}
+.import-btn:hover{border-color:var(--cl);color:var(--fg)}
+.imp-tbl{width:100%;border-collapse:collapse;font-size:.73rem;margin-top:.75rem}
+.imp-tbl th{text-align:left;padding:.28rem .4rem;border-bottom:1px solid var(--border);color:var(--fg2);font-weight:600}
+.imp-tbl td{padding:.28rem .4rem;border-bottom:1px solid rgba(255,255,255,.03);vertical-align:middle}
+.imp-tbl tr.skip td{opacity:.38;text-decoration:line-through}
+.imp-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:3px;vertical-align:middle}
+
 /* ── Auth overlay ── */
 #auth-ov { position:fixed; inset:0; background:var(--bg); z-index:1000; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.9rem; }
 #auth-ov.gone { display:none; }
@@ -199,6 +222,7 @@ details.coll[open] summary::before { content:'▼'; }
   <div class="stat"><span class="stat-val" id="s-wload">—</span><span>本週負荷</span></div>
   <div class="stat"><span class="stat-val" id="s-acwr">—</span><span>ACWR</span></div>
   <div class="stat"><span class="stat-val" id="s-sess">—</span><span>本週次數</span></div>
+  <button class="import-btn" onclick="openImport()">📥 Garmin</button>
   <div id="race-cntdwn">🏆 — 天後・半馬 8/2</div>
 </div>
 
@@ -220,6 +244,25 @@ details.coll[open] summary::before { content:'▼'; }
     <div class="metric-cards" id="metrics"></div>
     <div class="chart-box"><h3>週負荷趨勢（近12週）</h3><div id="ch-load"></div></div>
     <div class="chart-box"><h3>步頻趨勢（近10次跑步）</h3><div id="ch-cad"></div></div>
+  </div>
+</div>
+
+<div id="imp-ov"></div>
+<div id="imp-modal">
+  <div id="imp-hdr">📥 匯入 Garmin 資料<button onclick="closeImport()">✕</button></div>
+  <div id="imp-body">
+    <label class="imp-drop">
+      <input type="file" id="imp-file" accept=".csv,.tcx" onchange="handleImportFile(event)">
+      <div class="imp-ico">📂</div>
+      <div>點擊選擇 Garmin 匯出檔案</div>
+      <div class="imp-sub">支援 Garmin Connect 活動列表 .csv　或單次活動 .tcx</div>
+    </label>
+    <div id="imp-preview"></div>
+  </div>
+  <div id="imp-ftr">
+    <button class="btn-p" onclick="confirmImport()">確認匯入</button>
+    <button class="btn-c" onclick="closeImport()">取消</button>
+    <span id="imp-count"></span>
   </div>
 </div>
 
@@ -765,13 +808,191 @@ function typeIco(t) {
 
 function togWk(id) { document.getElementById(id).classList.toggle('open'); }
 
+// ── Garmin Import ─────────────────────────────────────────────────────────────
+let importQueue = [];
+
+function openImport() {
+  document.getElementById('imp-modal').classList.add('open');
+  document.getElementById('imp-ov').classList.add('open');
+  document.body.style.overflow = 'hidden';
+  document.getElementById('imp-preview').innerHTML = '';
+  document.getElementById('imp-ftr').style.display = 'none';
+  const fi = document.getElementById('imp-file'); if (fi) fi.value = '';
+  importQueue = [];
+}
+
+function closeImport() {
+  document.getElementById('imp-modal').classList.remove('open');
+  document.getElementById('imp-ov').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+function csvRow(line) {
+  const out = []; let cur = '', inQ = false;
+  for (const c of line) {
+    if (c === '"') inQ = !inQ;
+    else if (c === ',' && !inQ) { out.push(cur); cur = ''; }
+    else cur += c;
+  }
+  out.push(cur);
+  return out.map(s => s.trim());
+}
+
+function timeToMin(s) {
+  if (!s) return 0;
+  const p = s.split(':').map(Number);
+  return p.length === 3 ? Math.round(p[0]*60+p[1]+p[2]/60) : Math.round(p[0]+( p[1]||0)/60);
+}
+
+function autoRunType(dateStr, garminType) {
+  if (garminType.includes('interval')) return 'intervals';
+  const pl = getPlanned(dateStr);
+  return (pl && ['lsd','intervals'].includes(pl.type)) ? pl.type : 'easy';
+}
+
+function parseGarminCSV(text) {
+  const lines = text.trim().split(/\r?\n/);
+  if (lines.length < 2) return [];
+  const hdrs = csvRow(lines[0]);
+  const RUN = ['running','trail running','treadmill running','indoor running'];
+  const results = [];
+  for (let i = 1; i < lines.length; i++) {
+    if (!lines[i].trim()) continue;
+    const cols = csvRow(lines[i]);
+    const r = {};
+    hdrs.forEach((h, j) => r[h] = (cols[j]||'').replace(/^"|"$/g,''));
+    const at = (r['Activity Type']||'').toLowerCase();
+    if (!RUN.some(t => at.includes(t.split(' ')[0]))) continue;
+    const ds = (r['Date']||'').slice(0,10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(ds)) continue;
+    const sl = parseFloat(r['Avg Stride Length']); // meters in CSV
+    results.push({
+      date: ds,
+      type: autoRunType(ds, at),
+      duration: timeToMin(r['Time']),
+      distance: parseFloat(r['Distance'])||0,
+      avgPace: r['Avg Pace']||'',
+      avgHR: parseInt(r['Avg HR'])||0,
+      avgCadence: parseInt(r['Avg Run Cadence'])||0,         // CSV is already spm
+      avgStrideLength: sl ? Math.round(sl*100) : 0,          // m → cm
+      avgVerticalOscillation: parseFloat(r['Avg Vertical Oscillation'])||0,
+      avgGroundContactTime: parseInt(r['Avg Ground Contact Time'])||0,
+      avgVerticalRatio: parseFloat(r['Avg Vertical Ratio'])||0,
+    });
+  }
+  return results;
+}
+
+function parseGarminTCX(xml) {
+  const doc = new DOMParser().parseFromString(xml, 'text/xml');
+  const results = [];
+  doc.querySelectorAll('Activity').forEach(act => {
+    if (!(act.getAttribute('Sport')||'').toLowerCase().includes('running')) return;
+    const ds = act.querySelector('Id')?.textContent?.slice(0,10);
+    if (!ds) return;
+    let secs = 0, dist = 0;
+    act.querySelectorAll('Lap').forEach(l => {
+      secs += parseFloat(l.querySelector('TotalTimeSeconds')?.textContent||0);
+      dist += parseFloat(l.querySelector('DistanceMeters')?.textContent||0);
+    });
+    const hrEls = [...act.querySelectorAll('HeartRateBpm Value')];
+    const avgHR = hrEls.length ? Math.round(hrEls.reduce((s,e)=>s+ +e.textContent,0)/hrEls.length) : 0;
+    // TCX RunCadence = strides/min (per leg) → ×2 for spm
+    const cadEls = [...act.querySelectorAll('RunCadence')].filter(e=> +e.textContent>0);
+    const avgCad = cadEls.length ? Math.round(cadEls.reduce((s,e)=>s+ +e.textContent,0)/cadEls.length)*2 : 0;
+    const km = Math.round(dist)/1000;
+    let avgPace = '';
+    if (km>0 && secs>0) { const spk=secs/km; avgPace=`${Math.floor(spk/60)}:${p2(Math.round(spk%60))}`; }
+    results.push({ date:ds, type:autoRunType(ds,'running'), duration:Math.round(secs/60), distance:km, avgPace, avgHR, avgCadence:avgCad });
+  });
+  return results;
+}
+
+function handleImportFile(event) {
+  const file = event.target.files[0]; if (!file) return;
+  const ext = file.name.split('.').pop().toLowerCase();
+  const reader = new FileReader();
+  if (ext === 'csv') {
+    reader.onload = e => showImportPreview(parseGarminCSV(e.target.result));
+    reader.readAsText(file, 'UTF-8');
+  } else if (ext === 'tcx') {
+    reader.onload = e => showImportPreview(parseGarminTCX(e.target.result));
+    reader.readAsText(file, 'UTF-8');
+  } else {
+    alert('請上傳 .csv 或 .tcx 格式的 Garmin 匯出檔案');
+  }
+}
+
+const TCLR = { badminton:'#f97316',rest:'#4b5563',intervals:'#ef4444',strength:'#8b5cf6',easy:'#10b981',lsd:'#3b82f6',race:'#f59e0b' };
+
+function showImportPreview(activities) {
+  const prev = document.getElementById('imp-preview');
+  if (!activities.length) {
+    prev.innerHTML = '<p style="color:var(--fg2);font-size:.82rem;text-align:center;padding:1.5rem">找不到跑步活動，請確認匯出的是跑步活動紀錄</p>';
+    return;
+  }
+  importQueue = activities;
+  const today = todayStr();
+  const rows = activities.map((a,i) => {
+    const isFut = a.date > today;
+    const existing = (data[a.date]||[])[0];
+    return `<tr class="${isFut?'skip':''}">
+      <td><input type="checkbox" class="imp-chk" data-i="${i}" ${isFut?'disabled':'checked'}></td>
+      <td>${a.date}</td>
+      <td><span class="imp-dot" style="background:${TCLR[a.type]||'#888'}"></span>${a.type}</td>
+      <td>${a.distance||'—'}</td><td>${a.duration||'—'}</td><td>${a.avgPace||'—'}</td>
+      <td>${a.avgHR||'—'}</td><td>${a.avgCadence||'—'}</td>
+      <td style="color:${existing?'var(--crace)':'var(--ce)'}">${existing?'⚠️覆蓋':'新增'}</td>
+    </tr>`;
+  }).join('');
+  prev.innerHTML = `
+    <table class="imp-tbl">
+      <thead><tr><th></th><th>日期</th><th>類型</th><th>km</th><th>分</th><th>配速</th><th>HR</th><th>spm</th><th></th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <p style="font-size:.68rem;color:var(--fg2);margin-top:.5rem">劃掉為未來日期（不可匯入）・⚠️ 將覆蓋現有資料（保留 RPE/備註）</p>`;
+  const cnt = activities.filter(a=>a.date<=today).length;
+  document.getElementById('imp-count').textContent = `共 ${cnt} 筆可匯入`;
+  document.getElementById('imp-ftr').style.display = 'flex';
+}
+
+async function confirmImport() {
+  const checked = [...document.querySelectorAll('.imp-chk:checked')].map(c=>importQueue[+c.dataset.i]);
+  if (!checked.length) return;
+  checked.forEach(a => {
+    const existing = (data[a.date]||[])[0];
+    data[a.date] = [{
+      id: existing?.id || (Date.now().toString(36)+Math.random().toString(36).slice(2,5)),
+      time: existing?.time || '',
+      type: a.type, duration: a.duration,
+      rpe: existing?.rpe||0, load: a.duration*(existing?.rpe||0),
+      status: 'done', note: existing?.note||'',
+      metrics: {
+        ...(a.distance                 && {distance: a.distance}),
+        ...(a.avgPace                  && {avgPace: a.avgPace}),
+        ...(a.avgHR                    && {avgHR: a.avgHR}),
+        ...(a.avgCadence               && {avgCadence: a.avgCadence}),
+        ...(a.avgStrideLength          && {avgStrideLength: a.avgStrideLength}),
+        ...(a.avgVerticalOscillation   && {avgVerticalOscillation: a.avgVerticalOscillation}),
+        ...(a.avgGroundContactTime     && {avgGroundContactTime: a.avgGroundContactTime}),
+        ...(a.avgVerticalRatio         && {avgVerticalRatio: a.avgVerticalRatio}),
+        ...(existing?.metrics?.strengthDone && {strengthDone: existing.metrics.strengthDone}),
+      },
+    }];
+  });
+  const years = [...new Set(checked.map(a=>+a.date.slice(0,4)))];
+  for (const y of years) await saveYear(y);
+  closeImport();
+  renderAll();
+}
+
 // ── Keyboard ──────────────────────────────────────────────────────────────────
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') closePanel();
+  if (e.key === 'Escape') { closePanel(); closeImport(); }
   if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') saveEntry();
 });
 
-Object.assign(window, { doSignIn, switchView, calMov, openPanel, closePanel, saveEntry, delEntry, setRpe, setType, setStat, togWk, calcLoad });
+Object.assign(window, { doSignIn, switchView, calMov, openPanel, closePanel, saveEntry, delEntry, setRpe, setType, setStat, togWk, calcLoad, openImport, closeImport, handleImportFile, confirmImport });
 
 init().catch(console.error);
 </script>
