@@ -157,6 +157,30 @@ details.coll[open] summary::before{content:'▼'}
 .imp-tbl td{padding:.28rem .4rem;border-bottom:1px solid rgba(255,255,255,.03);vertical-align:middle}
 .imp-tbl tr.skip td{opacity:.38;text-decoration:line-through}
 .imp-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:3px;vertical-align:middle}
+
+/* ── AI Coach modal ── */
+#ai-ov{position:fixed;inset:0;background:rgba(0,0,0,.82);backdrop-filter:blur(4px);z-index:902;display:none}
+#ai-ov.open{display:block}
+#ai-modal{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg2);border:1px solid var(--border);border-radius:12px;width:min(680px,96vw);max-height:86vh;display:none;flex-direction:column;z-index:903}
+#ai-modal.open{display:flex}
+#ai-hdr{display:flex;align-items:center;padding:.7rem 1rem;border-bottom:1px solid var(--border);font-weight:700;font-size:.9rem;gap:.5rem}
+#ai-hdr button{margin-left:auto;background:none;border:none;color:var(--fg2);font-size:1.1rem;cursor:pointer}
+#ai-body{flex:1;overflow-y:auto;padding:1rem;font-size:.82rem;line-height:1.65}
+#ai-key-row{display:flex;gap:.45rem;align-items:center;margin-bottom:.8rem;padding:.65rem;background:var(--bg3);border-radius:8px;border:1px solid var(--border)}
+#ai-key-row label{font-size:.7rem;color:var(--fg2);white-space:nowrap}
+#ai-key-inp{flex:1;background:var(--bg);border:1px solid var(--border);color:var(--fg);border-radius:5px;padding:.3rem .5rem;font-size:.78rem;font-family:inherit}
+.ai-run-btn{padding:.32rem .85rem;border-radius:6px;background:var(--cl);color:#fff;border:none;cursor:pointer;font-size:.8rem;font-weight:600;font-family:inherit;white-space:nowrap}
+.ai-run-btn:disabled{opacity:.45;cursor:default}
+.ai-loading{text-align:center;padding:2rem;color:var(--fg2);font-size:.82rem}
+.ai-spinner{display:inline-block;width:1.4rem;height:1.4rem;border:2px solid var(--border);border-top-color:var(--cl);border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:.5rem}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ai-resp h3{font-size:.8rem;font-weight:700;margin:1rem 0 .3rem;color:var(--crace)}
+.ai-resp h4{font-size:.78rem;font-weight:700;margin:.75rem 0 .25rem;color:var(--cl)}
+.ai-resp ul{padding-left:1.1rem;margin:.25rem 0}
+.ai-resp li{margin:.18rem 0}
+.ai-resp strong{color:var(--fg)}
+.ai-resp p{margin:.3rem 0}
+.ai-note{font-size:.68rem;color:var(--fg2);margin-top:.5rem;padding:.4rem .6rem;background:var(--bg3);border-radius:5px}
 </style>
 </head>
 <body>
@@ -175,6 +199,7 @@ details.coll[open] summary::before{content:'▼'}
   <div class="stat"><span class="stat-val">0.82</span><span>ACWR</span></div>
   <div class="stat"><span class="stat-val" id="s-sess">—</span><span>本週次數</span></div>
   <button class="import-btn" onclick="openImport()">📥 Garmin</button>
+  <button class="import-btn" onclick="openAI()" style="border-color:var(--cs);color:var(--cs)">🤖 AI教練</button>
   <div id="race-cntdwn">🏆 <span id="cd">—</span> 天後・半馬 8/2</div>
 </div>
 <div id="main">
@@ -193,6 +218,20 @@ details.coll[open] summary::before{content:'▼'}
     </div>
     <div class="chart-box"><h3>週負荷趨勢（近12週）</h3><div id="ch-load"></div></div>
     <div class="chart-box"><h3>步頻趨勢（近10次跑步）</h3><div id="ch-cad"></div></div>
+  </div>
+</div>
+
+<div id="ai-ov"></div>
+<div id="ai-modal">
+  <div id="ai-hdr">🤖 AI 教練分析<button onclick="closeAI()">✕</button></div>
+  <div id="ai-body">
+    <div id="ai-key-row">
+      <label>Anthropic API Key</label>
+      <input type="password" id="ai-key-inp" placeholder="sk-ant-..." autocomplete="off">
+      <button class="ai-run-btn" id="ai-run-btn" onclick="runAICoach()">開始分析</button>
+    </div>
+    <div id="ai-content"></div>
+    <div class="ai-note">Key 僅存在本機 localStorage，不會上傳至任何地方。每次分析約消耗 0.02–0.05 USD（Haiku）。</div>
   </div>
 </div>
 
@@ -643,9 +682,108 @@ function confirmImport(){
   });
   closeImport();renderPlan();renderLSD();updateStats();
 }
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){closePanel();closeImport();}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closePanel();closeImport();closeAI();}});
 
-Object.assign(window,{switchView,openPanel,closePanel,saveEntry,delEntry,setRpe,setType,setStat,calcLoad,togWk,openImport,closeImport,handleImportFile,confirmImport});
+// ── AI Coach ──────────────────────────────────────────────────────────────────
+function openAI(){
+  document.getElementById('ai-modal').classList.add('open');
+  document.getElementById('ai-ov').classList.add('open');
+  document.body.style.overflow='hidden';
+  document.getElementById('ai-key-inp').value=localStorage.getItem('ll_ai_key')||'';
+  document.getElementById('ai-content').innerHTML='';
+}
+function closeAI(){
+  document.getElementById('ai-modal').classList.remove('open');
+  document.getElementById('ai-ov').classList.remove('open');
+  document.body.style.overflow='';
+}
+function avgLoadP(days){
+  let t=0;const now=new Date();
+  for(let i=0;i<days;i++){const d=new Date(now);d.setDate(now.getDate()-i);(DATA[fmtDate(d)]||[]).forEach(e=>t+=e.load||0);}
+  return t/days;
+}
+function buildCoachingPrompt(){
+  const today=todayStr();
+  const daysLeft=Math.ceil((new Date(PLAN.raceDate)-new Date())/86400000);
+  const a7=avgLoadP(7),a28=avgLoadP(28);
+  const acwr=a28>0?(a7/a28).toFixed(2):'無資料';
+  const pastWeeks=PLAN.weeks.filter(w=>w.start<=today);
+  const weekLines=pastWeeks.map(w=>{
+    const days=weekDays(w);let done=0,skip=0,partial=0,load=0;
+    days.forEach(d=>{const ds=addD(w.start,d.offset);if(ds>today)return;const e=(DATA[ds]||[])[0];if(!e)return;
+      if(e.status==='done')done++;else if(e.status==='skip')skip++;else if(e.status==='partial')partial++;
+      load+=e.load||0;});
+    return `- ${w.label}（${w.phase}）：完成${done} 跳過${skip} 部分${partial} / 週負荷 ${load}`;
+  }).join('\n');
+  const runs=[];
+  Object.entries(DATA).sort().forEach(([date,arr])=>{arr.forEach(e=>{if(['easy','lsd','intervals'].includes(e.type)&&e.status!=='skip')runs.push({date,type:e.type,duration:e.duration||0,...e.metrics});});});
+  const last3=runs.slice(-3);
+  const runLines=last3.length?last3.map(r=>`- ${r.date} ${r.type}：${r.distance||'?'}km，配速 ${r.avgPace||'?'}，HR ${r.avgHR||'?'}bpm，步頻 ${r.avgCadence||'?'}spm`).join('\n'):'（尚無跑步資料）';
+  const upcoming=PLAN.weeks.filter(w=>addD(w.start,6)>=today).slice(0,3);
+  const upcomingLines=upcoming.map(w=>{
+    const days=weekDays(w);
+    const dayLines=days.map(d=>{const ds=addD(w.start,d.offset);const done=(DATA[ds]||[])[0];
+      const status=ds<today?(done?`✓已完成(load:${done.load||0})`:'✗未記錄'):'（待完成）';
+      return `  ${ds} ${d.label} ${status}`;}).join('\n');
+    return `### ${w.label}（${w.phase}，LSD目標${w.lsdKm||'N/A'}km）\n${dayLines}`;
+  }).join('\n\n');
+  return `你是一位專業耐力運動教練，正在協助一位業餘跑者完成半馬備賽計畫。
+
+## 選手概況
+- 目標：2026-08-02 半馬（21.1km），目標完成時間 2:30:00
+- 距比賽：${daysLeft} 天
+- ACWR：${acwr}（健康區間 0.8–1.3）
+
+## 已完成訓練週摘要
+${weekLines||'（無資料）'}
+
+## 最近 3 次跑步數據
+${runLines}
+
+## 接下來課表（含本週）
+${upcomingLines}
+
+---
+請依據以上資料，用**繁體中文**回答以下三點（條列式、簡潔）：
+
+## 1. 目前訓練狀況評估
+（優點、潛在問題、ACWR 是否安全）
+
+## 2. 接下來課表建議
+（是否需要調整強度、內容、順序，並說明理由）
+
+## 3. 賽前注意事項
+（受傷預防、飲食、睡眠、賽前減量策略重點）`;
+}
+function mdToHtml(text){
+  return text.replace(/^## (.+)$/gm,'<h3>$1</h3>').replace(/^### (.+)$/gm,'<h4>$1</h4>')
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/^[-•] (.+)$/gm,'<li>$1</li>')
+    .replace(/(<li>[\s\S]*?<\/li>)(?=\n<li>|\n*$)/g,m=>`<ul>${m}</ul>`)
+    .replace(/\n{2,}/g,'</p><p>');
+}
+async function runAICoach(){
+  const keyInp=document.getElementById('ai-key-inp');
+  const key=keyInp.value.trim();
+  if(!key.startsWith('sk-ant-')){alert('請輸入有效的 Anthropic API Key（以 sk-ant- 開頭）');return;}
+  localStorage.setItem('ll_ai_key',key);
+  const btn=document.getElementById('ai-run-btn');
+  const content=document.getElementById('ai-content');
+  btn.disabled=true;
+  content.innerHTML='<div class="ai-loading"><span class="ai-spinner"></span>分析中，通常需要 5–15 秒…</div>';
+  try{
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-allow-browser':'true'},
+      body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:1200,messages:[{role:'user',content:buildCoachingPrompt()}]})});
+    if(!resp.ok){const err=await resp.json().catch(()=>({}));throw new Error(err?.error?.message||`HTTP ${resp.status}`);}
+    const result=await resp.json();
+    const text=result.content?.[0]?.text||'（無回應）';
+    content.innerHTML=`<div class="ai-resp"><p>${mdToHtml(text)}</p></div>`;
+  }catch(e){
+    content.innerHTML=`<div style="color:#ef4444;font-size:.8rem;padding:.5rem">❌ 發生錯誤：${e.message}</div>`;
+  }finally{btn.disabled=false;}
+}
+
+Object.assign(window,{switchView,openPanel,closePanel,saveEntry,delEntry,setRpe,setType,setStat,calcLoad,togWk,openImport,closeImport,handleImportFile,confirmImport,openAI,closeAI,runAICoach});
 </script>
 </body>
 </html>
