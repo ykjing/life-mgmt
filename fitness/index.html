@@ -295,13 +295,11 @@ details.coll[open] summary::before { content:'▼'; }
 <div id="ai-modal">
   <div id="ai-hdr">🤖 AI 教練分析<button onclick="closeAI()">✕</button></div>
   <div id="ai-body">
-    <div id="ai-key-row">
-      <label>Anthropic API Key</label>
-      <input type="password" id="ai-key-inp" placeholder="sk-ant-..." autocomplete="off">
-      <button class="ai-run-btn" id="ai-run-btn" onclick="runAICoach()">開始分析</button>
+    <div style="display:flex;justify-content:flex-end;margin-bottom:.8rem">
+      <button class="ai-run-btn" id="ai-run-btn" onclick="runAICoach()">🤖 開始分析</button>
     </div>
     <div id="ai-content"></div>
-    <div class="ai-note">Key 僅存在本機 localStorage，不會上傳至任何地方。每次分析約消耗 0.02–0.05 USD（Haiku）。</div>
+    <div class="ai-note">分析由 Gemini 2.0 Flash 提供，透過 Cloudflare Function 代理，API key 不經過瀏覽器。</div>
   </div>
 </div>
 
@@ -1132,39 +1130,20 @@ function mdToHtml(text) {
 }
 
 async function runAICoach() {
-  const keyInp = document.getElementById('ai-key-inp');
-  const key = keyInp.value.trim();
-  if (!key.startsWith('sk-ant-')) { alert('請輸入有效的 Anthropic API Key（以 sk-ant- 開頭）'); return; }
-  localStorage.setItem('ll_ai_key', key);
-
   const btn = document.getElementById('ai-run-btn');
   const content = document.getElementById('ai-content');
   btn.disabled = true;
   content.innerHTML = '<div class="ai-loading"><span class="ai-spinner"></span>分析中，通常需要 5–15 秒…</div>';
 
-  const prompt = buildCoachingPrompt();
   try {
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    const resp = await fetch('/api/ai-coach', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': key,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-allow-browser': 'true',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 1200,
-        messages: [{ role: 'user', content: prompt }],
-      }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: buildCoachingPrompt() }),
     });
-    if (!resp.ok) {
-      const err = await resp.json().catch(() => ({}));
-      throw new Error(err?.error?.message || `HTTP ${resp.status}`);
-    }
     const result = await resp.json();
-    const text = result.content?.[0]?.text || '（無回應）';
-    content.innerHTML = `<div class="ai-resp"><p>${mdToHtml(text)}</p></div>`;
+    if (!resp.ok) throw new Error(result.error || `HTTP ${resp.status}`);
+    content.innerHTML = `<div class="ai-resp"><p>${mdToHtml(result.text)}</p></div>`;
   } catch (e) {
     content.innerHTML = `<div style="color:#ef4444;font-size:.8rem;padding:.5rem">❌ 發生錯誤：${e.message}</div>`;
   } finally {
