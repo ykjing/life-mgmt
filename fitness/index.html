@@ -6,6 +6,7 @@
 <title>Fitness — Life</title>
 <script src="https://accounts.google.com/gsi/client" async></script>
 <link rel="stylesheet" href="../shared/style.css">
+<link rel="stylesheet" href="https://cdn-uicons.flaticon.com/2.6.0/uicons-regular-rounded/css/uicons-regular-rounded.css">
 <style>
 /* ════════════════════════════════════════════════════════════
    Design tokens — Glassmorphism dark theme
@@ -664,6 +665,88 @@ details.coll[open] summary::before { content: '▼'; }
 }
 .g-btn:hover { box-shadow: 0 0 40px rgba(96,165,250,.5); transform: translateY(-1px); }
 
+/* ── Goals view ─────────────────────────────────────────────────────────── */
+.goals-hd { display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem; }
+.goals-hd h3 { font-size:1rem; font-weight:700; }
+.goals-add-btn {
+  display:inline-flex; align-items:center; gap:.35rem;
+  padding:.38rem .9rem; border-radius:var(--r-pill); cursor:pointer; font-family:inherit;
+  background:rgba(96,165,250,.12); border:1px solid rgba(96,165,250,.3); color:var(--cl);
+  font-size:.78rem; font-weight:600; transition:all var(--t);
+}
+.goals-add-btn:hover { background:rgba(96,165,250,.22); border-color:rgba(96,165,250,.5); }
+.goals-empty { text-align:center; padding:3rem 1rem; color:var(--fg2); }
+.goals-empty i { font-size:2.4rem; opacity:.38; margin-bottom:.6rem; display:block; }
+.goals-empty p { font-size:.85rem; line-height:1.7; }
+.goal-card {
+  background:var(--glass-bg); backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur);
+  border:var(--glass-border); border-radius:var(--r); padding:1rem 1.1rem;
+  box-shadow:var(--glass-shadow),var(--glass-hi); margin-bottom:.75rem; transition:box-shadow var(--t);
+}
+.goal-card:hover { box-shadow:var(--glass-shadow-h),var(--glass-hi); }
+.goal-card.completed,.goal-card.dnf { opacity:.72; }
+.goal-card.cancelled { opacity:.48; }
+.gc-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:.55rem; flex-wrap:wrap; gap:.35rem; }
+.gc-icon-name { display:flex; align-items:center; gap:.45rem; min-width:0; }
+.gc-sport-icon { font-size:1.05rem; color:var(--cl); flex-shrink:0; }
+.gc-name { font-size:.95rem; font-weight:700; }
+.gc-sport-label { font-size:.62rem; color:var(--fg2); background:rgba(255,255,255,.07); padding:.1rem .42rem; border-radius:var(--r-pill); flex-shrink:0; }
+.gcd { font-size:.7rem; font-weight:700; padding:.18rem .62rem; border-radius:var(--r-pill); flex-shrink:0; }
+.gcd-future    { background:rgba(251,191,36,.15);  color:var(--crace); border:1px solid rgba(251,191,36,.3); }
+.gcd-past      { background:rgba(100,116,139,.12); color:var(--cr);    border:1px solid rgba(100,116,139,.22); }
+.gcd-completed { background:rgba(52,211,153,.12);  color:var(--ce);    border:1px solid rgba(52,211,153,.3); }
+.gcd-dnf       { background:rgba(248,113,113,.12); color:var(--ci);    border:1px solid rgba(248,113,113,.25); }
+.gcd-cancelled { background:rgba(255,255,255,.06); color:var(--fg2);   border:1px solid rgba(255,255,255,.1); }
+.gc-meta { display:flex; flex-wrap:wrap; gap:.45rem .85rem; font-size:.72rem; color:var(--fg2); margin-bottom:.45rem; align-items:center; }
+.gc-meta i { font-size:.68rem; opacity:.72; }
+.gc-url { color:var(--cl); text-decoration:none; display:inline-flex; align-items:center; gap:.25rem; }
+.gc-url:hover { text-decoration:underline; }
+.gc-chips { display:flex; flex-wrap:wrap; gap:.32rem; margin-bottom:.45rem; }
+.gtag { font-size:.67rem; background:rgba(96,165,250,.1); border:1px solid rgba(96,165,250,.2); color:var(--cl); padding:.1rem .5rem; border-radius:var(--r-pill); }
+.gc-note { font-size:.74rem; color:var(--fg2); margin-bottom:.55rem; line-height:1.6; white-space:pre-wrap; }
+.gc-actions { display:flex; gap:.38rem; justify-content:flex-end; border-top:1px solid rgba(255,255,255,.06); padding-top:.48rem; margin-top:.1rem; }
+.gc-actions button { font-size:.72rem; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.1); color:var(--fg2); padding:.22rem .58rem; border-radius:var(--r-sm); cursor:pointer; font-family:inherit; display:inline-flex; align-items:center; gap:.28rem; transition:all var(--t); }
+.gc-actions button:hover { background:rgba(255,255,255,.1); color:var(--fg); }
+.gc-del:hover { background:rgba(248,113,113,.1)!important; color:var(--ci)!important; border-color:rgba(248,113,113,.25)!important; }
+/* ── Goal modal ── */
+#goal-ov { position:fixed; inset:0; background:rgba(0,0,0,.65); backdrop-filter:blur(6px); z-index:902; display:none; }
+#goal-ov.open { display:block; }
+#goal-modal {
+  position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+  background:rgba(10,10,28,.92); backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px);
+  border:1px solid rgba(255,255,255,.12); border-radius:16px;
+  box-shadow:0 24px 80px rgba(0,0,0,.6),var(--glass-hi);
+  width:min(560px,96vw); max-height:88vh; display:none; flex-direction:column; z-index:903;
+}
+#goal-modal.open { display:flex; }
+#gm-hdr { display:flex; align-items:center; padding:.85rem 1.1rem; border-bottom:1px solid rgba(255,255,255,.08); font-weight:700; font-size:.92rem; background:rgba(255,255,255,.03); }
+#gm-hdr button { margin-left:auto; background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.12); color:var(--fg2); font-size:1rem; cursor:pointer; width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; transition:all var(--t); }
+#gm-hdr button:hover { background:rgba(255,255,255,.13); color:var(--fg); }
+#gm-body { flex:1; overflow-y:auto; padding:1rem 1.1rem; display:flex; flex-direction:column; gap:.7rem; }
+.gm-row { display:flex; flex-direction:column; gap:.22rem; }
+.gm-row label { font-size:.65rem; color:var(--fg2); font-weight:600; letter-spacing:.04em; text-transform:uppercase; }
+.gm-row input,.gm-row select,.gm-row textarea {
+  background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1); color:var(--fg);
+  border-radius:var(--r-sm); padding:.42rem .62rem; font-family:inherit; font-size:.82rem;
+  transition:border-color var(--t); outline:none; width:100%;
+}
+.gm-row input:focus,.gm-row select:focus,.gm-row textarea:focus { border-color:rgba(96,165,250,.5); background:rgba(96,165,250,.04); }
+.gm-row select option { background:#0e0e24; }
+.gm-row textarea { resize:vertical; min-height:54px; }
+.gm-2col { display:grid; grid-template-columns:1fr 1fr; gap:.55rem; }
+.gm-url-row { display:flex; gap:.4rem; }
+.gm-url-row input { flex:1; }
+.gm-parse-btn { flex-shrink:0; padding:.38rem .7rem; border-radius:var(--r-sm); cursor:pointer; background:rgba(96,165,250,.1); border:1px solid rgba(96,165,250,.28); color:var(--cl); font-size:.72rem; font-family:inherit; font-weight:600; transition:all var(--t); white-space:nowrap; display:inline-flex; align-items:center; gap:.25rem; }
+.gm-parse-btn:disabled { opacity:.38; cursor:not-allowed; }
+.gm-parse-btn:not(:disabled):hover { background:rgba(96,165,250,.2); border-color:rgba(96,165,250,.5); }
+.gm-parse-status { font-size:.7rem; min-height:.9rem; line-height:1.4; }
+.gm-sec-hd { font-size:.67rem; font-weight:700; color:var(--fg2); letter-spacing:.06em; text-transform:uppercase; padding:.15rem 0; border-bottom:1px solid rgba(255,255,255,.07); }
+#gm-ftr { display:flex; gap:.5rem; justify-content:flex-end; padding:.75rem 1.1rem; border-top:1px solid rgba(255,255,255,.08); background:rgba(255,255,255,.02); flex-shrink:0; }
+.gm-cancel { padding:.42rem 1rem; border-radius:var(--r-pill); cursor:pointer; font-family:inherit; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.1); color:var(--fg2); font-size:.8rem; transition:all var(--t); }
+.gm-cancel:hover { background:rgba(255,255,255,.1); color:var(--fg); }
+.gm-save { padding:.42rem 1.2rem; border-radius:var(--r-pill); cursor:pointer; font-family:inherit; background:linear-gradient(135deg,rgba(96,165,250,.22),rgba(96,165,250,.12)); border:1px solid rgba(96,165,250,.38); color:var(--cl); font-size:.8rem; font-weight:700; transition:all var(--t); display:inline-flex; align-items:center; gap:.3rem; }
+.gm-save:hover { background:linear-gradient(135deg,rgba(96,165,250,.38),rgba(96,165,250,.22)); border-color:rgba(96,165,250,.6); color:#fff; }
+
 /* ── Scrollbar ───────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -683,6 +766,7 @@ details.coll[open] summary::before { content: '▼'; }
   <button class="view-tab active" data-v="plan"   onclick="switchView('plan')">備賽計畫</button>
   <button class="view-tab"        data-v="cal"    onclick="switchView('cal')">訓練日誌</button>
   <button class="view-tab"        data-v="trends" onclick="switchView('trends')">趨勢分析</button>
+  <button class="view-tab"        data-v="goals"  onclick="switchView('goals')">目標規劃</button>
 </div>
 
 <div id="stats-bar">
@@ -712,6 +796,13 @@ details.coll[open] summary::before { content: '▼'; }
     <div class="metric-cards" id="metrics"></div>
     <div class="chart-box"><h3>週負荷趨勢（近12週）</h3><div id="ch-load"></div></div>
     <div class="chart-box"><h3>步頻趨勢（近10次跑步）</h3><div id="ch-cad"></div></div>
+  </div>
+  <div id="v-goals" style="display:none">
+    <div class="goals-hd">
+      <h3>目標活動</h3>
+      <button class="goals-add-btn" onclick="openGoalModal()"><i class="fi fi-rr-plus"></i> 新增目標</button>
+    </div>
+    <div id="goals-list"></div>
   </div>
 </div>
 
@@ -743,6 +834,83 @@ details.coll[open] summary::before { content: '▼'; }
     </div>
     <div id="ai-content"></div>
     <div class="ai-note" id="ai-note"></div>
+  </div>
+</div>
+
+<div id="goal-ov"></div>
+<div id="goal-modal">
+  <div id="gm-hdr">
+    <span id="gm-title">新增目標</span>
+    <button onclick="closeGoalModal()"><i class="fi fi-rr-xmark"></i></button>
+  </div>
+  <div id="gm-body">
+    <div class="gm-row">
+      <label>活動連結（選填）</label>
+      <div class="gm-url-row">
+        <input type="url" id="gm-url" placeholder="https://…" oninput="onGoalUrlInput()">
+        <button class="gm-parse-btn" id="gm-parse-btn" onclick="parseGoalUrlAI()" disabled><i class="fi fi-rr-magic-wand"></i> AI 解析</button>
+      </div>
+      <div class="gm-parse-status" id="gm-parse-status"></div>
+    </div>
+    <div class="gm-sec-hd">基本資訊</div>
+    <div class="gm-row">
+      <label>活動名稱 *</label>
+      <input type="text" id="gm-name" placeholder="e.g. 富士山登頂、半馬、環島騎車">
+    </div>
+    <div class="gm-2col">
+      <div class="gm-row">
+        <label>類型</label>
+        <select id="gm-sport">
+          <option value="running">跑步</option>
+          <option value="hiking">登山</option>
+          <option value="cycling">騎車</option>
+          <option value="triathlon">鐵人三項</option>
+          <option value="other">其他</option>
+        </select>
+      </div>
+      <div class="gm-row">
+        <label>日期 *</label>
+        <input type="date" id="gm-date">
+      </div>
+    </div>
+    <div class="gm-row">
+      <label>地點</label>
+      <input type="text" id="gm-location" placeholder="e.g. 靜岡縣，日本">
+    </div>
+    <div class="gm-sec-hd">目標設定</div>
+    <div class="gm-2col">
+      <div class="gm-row">
+        <label>距離（km）</label>
+        <input type="number" id="gm-dist" placeholder="21.1" step="0.1" min="0">
+      </div>
+      <div class="gm-row">
+        <label>目標完成時間</label>
+        <input type="text" id="gm-time" placeholder="2:30:00">
+      </div>
+    </div>
+    <div class="gm-2col">
+      <div class="gm-row">
+        <label>爬升（m）</label>
+        <input type="number" id="gm-elev" placeholder="1500" min="0">
+      </div>
+      <div class="gm-row">
+        <label>狀態</label>
+        <select id="gm-status">
+          <option value="upcoming">即將到來</option>
+          <option value="completed">已完成</option>
+          <option value="dnf">放棄 DNF</option>
+          <option value="cancelled">取消</option>
+        </select>
+      </div>
+    </div>
+    <div class="gm-row">
+      <label>備註</label>
+      <textarea id="gm-note" placeholder="其他目標、注意事項…" rows="2"></textarea>
+    </div>
+  </div>
+  <div id="gm-ftr">
+    <button class="gm-cancel" onclick="closeGoalModal()">取消</button>
+    <button class="gm-save" onclick="saveGoal()"><i class="fi fi-rr-check"></i> 儲存目標</button>
   </div>
 </div>
 
@@ -817,6 +985,16 @@ const PLAN = {
   ],
 };
 
+let GOALS = [
+  {
+    id: 'g1', name: '半馬', sport: 'running', date: '2026-08-02',
+    location: '台灣', url: '', note: '',
+    targets: { distance: 21.1, finishTime: '2:30:00', elevationGain: null, custom: '' },
+    status: 'upcoming', createdAt: '2026-07-01',
+  }
+];
+let editingGoalId = null;
+
 const EX_WED = [
   { k:'goblet',    lbl:'Goblet Squat',           info:'4組×12次' },
   { k:'bridge',    lbl:'Glute Bridge',            info:'4組×15次' },
@@ -839,7 +1017,7 @@ let pDate = null, pRpe = 0, pType = 'easy', pStat = 'done';
 // ── Auth ─────────────────────────────────────────────────────────────────────
 async function init() {
   renderNav('fitness');
-  updateCountdown();
+  updateRaceCountdown();
   renderPlan();
 
   const stored = loadStoredToken();
@@ -855,6 +1033,8 @@ async function activateStore() {
   const y = new Date().getFullYear();
   const raw = await store.readJson(`${y}.json`);
   if (raw) data = raw;
+  const rawGoals = await store.readJson('goals.json');
+  if (rawGoals) GOALS = rawGoals;
   document.getElementById('auth-ov').classList.add('gone');
   renderAll();
 }
@@ -880,20 +1060,28 @@ function switchView(v) {
   document.getElementById('v-plan').style.display   = v === 'plan'   ? '' : 'none';
   document.getElementById('v-cal').style.display    = v === 'cal'    ? '' : 'none';
   document.getElementById('v-trends').style.display = v === 'trends' ? '' : 'none';
+  document.getElementById('v-goals').style.display  = v === 'goals'  ? '' : 'none';
   if (v === 'cal') renderCal();
   if (v === 'trends') renderTrends();
+  if (v === 'goals') renderGoals();
 }
 
 function renderAll() { updateStats(); renderPlan(); }
 
 // ── Stats bar ────────────────────────────────────────────────────────────────
-function updateCountdown() {
-  const d = Math.ceil((new Date(PLAN.raceDate) - new Date()) / 86400000);
-  document.getElementById('race-cntdwn').textContent = `${d} 天後・半馬 8/2`;
+function updateRaceCountdown() {
+  const el = document.getElementById('race-cntdwn');
+  if (!el) return;
+  const upcoming = GOALS.filter(g => g.status === 'upcoming').sort((a, b) => a.date.localeCompare(b.date));
+  if (!upcoming.length) { el.textContent = ''; el.style.display = 'none'; return; }
+  el.style.display = '';
+  const g = upcoming[0];
+  const days = Math.ceil((new Date(g.date) - new Date()) / 86400000);
+  el.innerHTML = '<span>' + days + '</span> 天後・' + g.name + ' ' + g.date.slice(5).replace('-', '/');
 }
 
 function updateStats() {
-  updateCountdown();
+  updateRaceCountdown();
   const mon = weekMonday(new Date());
   let wload = 0, sess = 0;
   for (let i = 0; i < 7; i++) {
@@ -1495,7 +1683,11 @@ function closeAI() {
 
 function buildCoachingPrompt() {
   const today = todayStr();
-  const daysLeft = Math.ceil((new Date(PLAN.raceDate) - new Date()) / 86400000);
+  const nextGoal = GOALS.filter(g => g.status === 'upcoming').sort((a, b) => a.date.localeCompare(b.date))[0];
+  const daysLeft = nextGoal ? Math.ceil((new Date(nextGoal.date) - new Date()) / 86400000) : '?';
+  const goalDesc = nextGoal
+    ? (nextGoal.date + ' ' + nextGoal.name + (nextGoal.targets?.distance ? ' (' + nextGoal.targets.distance + 'km)' : '') + (nextGoal.targets?.finishTime ? '，目標 ' + nextGoal.targets.finishTime : ''))
+    : '尚未設定目標';
   const a7 = avgLoad(7), a28 = avgLoad(28);
   const acwr = a28 > 0 ? (a7 / a28).toFixed(2) : '無資料';
 
@@ -1546,7 +1738,7 @@ function buildCoachingPrompt() {
   return `你是一位專業耐力運動教練，正在協助一位業餘跑者完成半馬備賽計畫。
 
 ## 選手概況
-- 目標：2026-08-02 半馬（21.1km），目標完成時間 2:30:00
+- 目標：${goalDesc}
 - 距比賽：${daysLeft} 天
 - ACWR（急性:慢性負荷比）：${acwr}（健康區間 0.8–1.3）
 
@@ -1638,13 +1830,182 @@ async function runAICoach() {
   }
 }
 
+// ── Goals ────────────────────────────────────────────────────────────────────
+function renderGoals() {
+  const list = document.getElementById('goals-list');
+  if (!list) return;
+  const today = todayStr();
+  const sportIcon = {
+    running:   '<i class="fi fi-rr-running"></i>',
+    hiking:    '<i class="fi fi-rr-mountains"></i>',
+    cycling:   '<i class="fi fi-rr-bicycle"></i>',
+    triathlon: '<i class="fi fi-rr-trophy"></i>',
+    other:     '<i class="fi fi-rr-flag"></i>',
+  };
+  const sportLbl = { running:'跑步', hiking:'登山', cycling:'騎車', triathlon:'鐵人三項', other:'其他' };
+  if (!GOALS.length) {
+    list.innerHTML = '<div class="goals-empty"><i class="fi fi-rr-flag"></i><p>尚無目標活動<br>點擊「新增目標」開始規劃</p></div>';
+    return;
+  }
+  const sorted = [...GOALS].sort((a, b) => {
+    if (a.status === 'upcoming' && b.status !== 'upcoming') return -1;
+    if (b.status === 'upcoming' && a.status !== 'upcoming') return 1;
+    return a.date.localeCompare(b.date);
+  });
+  list.innerHTML = sorted.map(g => {
+    const dl = Math.ceil((new Date(g.date) - new Date(today)) / 86400000);
+    const isPast = dl < 0;
+    let cdCls, cdTxt;
+    if (g.status === 'completed') { cdCls = 'gcd-completed'; cdTxt = '已完成'; }
+    else if (g.status === 'dnf')  { cdCls = 'gcd-dnf';       cdTxt = 'DNF'; }
+    else if (g.status === 'cancelled') { cdCls = 'gcd-cancelled'; cdTxt = '取消'; }
+    else if (isPast) { cdCls = 'gcd-past';   cdTxt = Math.abs(dl) + '天前'; }
+    else             { cdCls = 'gcd-future'; cdTxt = dl + '天後'; }
+    const chips = [];
+    if (g.targets?.distance)      chips.push(g.targets.distance + 'km');
+    if (g.targets?.finishTime)    chips.push('目標 ' + g.targets.finishTime);
+    if (g.targets?.elevationGain) chips.push('爬升 ' + g.targets.elevationGain + 'm');
+    if (g.targets?.custom)        chips.push(g.targets.custom);
+    const chipsHtml = chips.map(ch => '<span class="gtag">' + ch + '</span>').join('');
+    const meta = ['<span><i class="fi fi-rr-calendar"></i> ' + g.date + '</span>'];
+    if (g.location) meta.push('<span><i class="fi fi-rr-marker"></i> ' + g.location + '</span>');
+    if (g.url)      meta.push('<a class="gc-url" href="' + g.url + '" target="_blank" rel="noopener"><i class="fi fi-rr-link"></i> 活動連結</a>');
+    return '<div class="goal-card ' + g.status + '">'
+      + '<div class="gc-head"><div class="gc-icon-name">'
+      + '<span class="gc-sport-icon">' + (sportIcon[g.sport] || sportIcon.other) + '</span>'
+      + '<span class="gc-name">' + g.name + '</span>'
+      + '<span class="gc-sport-label">' + (sportLbl[g.sport] || g.sport) + '</span>'
+      + '</div><span class="gcd ' + cdCls + '">' + cdTxt + '</span></div>'
+      + '<div class="gc-meta">' + meta.join('') + '</div>'
+      + (chipsHtml ? '<div class="gc-chips">' + chipsHtml + '</div>' : '')
+      + (g.note ? '<div class="gc-note">' + g.note + '</div>' : '')
+      + '<div class="gc-actions">'
+      + '<button onclick="openGoalModal('' + g.id + '')"><i class="fi fi-rr-edit"></i> 編輯</button>'
+      + '<button class="gc-del" onclick="deleteGoal('' + g.id + '')"><i class="fi fi-rr-trash"></i> 刪除</button>'
+      + '</div></div>';
+  }).join('');
+}
+
+function openGoalModal(id) {
+  editingGoalId = id || null;
+  document.getElementById('gm-title').textContent = id ? '編輯目標' : '新增目標';
+  if (id) {
+    const g = GOALS.find(x => x.id === id); if (!g) return;
+    document.getElementById('gm-url').value      = g.url || '';
+    document.getElementById('gm-name').value     = g.name;
+    document.getElementById('gm-sport').value    = g.sport;
+    document.getElementById('gm-date').value     = g.date;
+    document.getElementById('gm-location').value = g.location || '';
+    document.getElementById('gm-dist').value     = g.targets?.distance || '';
+    document.getElementById('gm-time').value     = g.targets?.finishTime || '';
+    document.getElementById('gm-elev').value     = g.targets?.elevationGain || '';
+    document.getElementById('gm-status').value   = g.status || 'upcoming';
+    document.getElementById('gm-note').value     = g.note || '';
+  } else {
+    ['gm-url','gm-name','gm-location','gm-dist','gm-time','gm-elev','gm-note'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('gm-sport').value  = 'running';
+    document.getElementById('gm-status').value = 'upcoming';
+  }
+  document.getElementById('gm-parse-status').textContent = '';
+  onGoalUrlInput();
+  document.getElementById('goal-ov').classList.add('open');
+  document.getElementById('goal-modal').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeGoalModal() {
+  document.getElementById('goal-ov').classList.remove('open');
+  document.getElementById('goal-modal').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+async function saveGoal() {
+  const name = document.getElementById('gm-name').value.trim();
+  const date = document.getElementById('gm-date').value;
+  if (!name || !date) { alert('請填寫活動名稱和日期'); return; }
+  const existing = editingGoalId ? GOALS.find(x => x.id === editingGoalId) : null;
+  const g = {
+    id: editingGoalId || (Date.now().toString(36) + Math.random().toString(36).slice(2, 5)),
+    name, sport: document.getElementById('gm-sport').value, date,
+    location: document.getElementById('gm-location').value.trim(),
+    url:      document.getElementById('gm-url').value.trim(),
+    note:     document.getElementById('gm-note').value.trim(),
+    targets: {
+      distance:      parseFloat(document.getElementById('gm-dist').value) || null,
+      finishTime:    document.getElementById('gm-time').value.trim() || null,
+      elevationGain: parseInt(document.getElementById('gm-elev').value) || null,
+      custom: '',
+    },
+    status: document.getElementById('gm-status').value,
+    createdAt: existing ? existing.createdAt : todayStr(),
+  };
+  if (editingGoalId) { const i = GOALS.findIndex(x => x.id === editingGoalId); if (i >= 0) GOALS[i] = g; }
+  else GOALS.push(g);
+  if (store) await store.writeJson('goals.json', GOALS, () => {});
+  updateRaceCountdown();
+  closeGoalModal();
+  renderGoals();
+}
+
+async function deleteGoal(id) {
+  if (!confirm('確定刪除這個目標嗎？')) return;
+  GOALS = GOALS.filter(x => x.id !== id);
+  if (store) await store.writeJson('goals.json', GOALS, () => {});
+  updateRaceCountdown();
+  renderGoals();
+}
+
+function onGoalUrlInput() {
+  const url = document.getElementById('gm-url').value.trim();
+  document.getElementById('gm-parse-btn').disabled = !url || !url.startsWith('http');
+}
+
+async function parseGoalUrlAI() {
+  const url = document.getElementById('gm-url').value.trim();
+  if (!url) return;
+  const statusEl = document.getElementById('gm-parse-status');
+  const btn = document.getElementById('gm-parse-btn');
+  const key = localStorage.getItem('ll_ai_key') || '';
+  if (!key.startsWith('sk-ant-')) {
+    statusEl.textContent = '請先在 AI 教練面板中輸入 Anthropic API Key';
+    statusEl.style.color = 'var(--crace)'; return;
+  }
+  btn.disabled = true;
+  statusEl.innerHTML = '解析中…'; statusEl.style.color = 'var(--fg2)';
+  const prompt = '以下是一個活動或賽事的連結：
+' + url + '
+
+請依據 URL 的 domain、path 與關鍵字，推測活動資訊，並以 JSON 格式回覆（欄位：name、sport（running/hiking/cycling/triathlon/other）、date（YYYY-MM-DD，不確定請留空）、location、distance_km（數字或 null）、finish_time（HH:MM:SS 或空字串）、note）。只回覆 JSON，不含任何說明或 Markdown。';
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-allow-browser': 'true' },
+      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 300, messages: [{ role: 'user', content: prompt }] }) });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const result = await resp.json();
+    const text = result.content?.[0]?.text || '';
+    const m = text.match(/\{[\s\S]*\}/);
+    if (!m) throw new Error('無法解析回應');
+    const parsed = JSON.parse(m[0]);
+    if (parsed.name)        document.getElementById('gm-name').value = parsed.name;
+    if (parsed.sport)       document.getElementById('gm-sport').value = parsed.sport;
+    if (parsed.date)        document.getElementById('gm-date').value = parsed.date;
+    if (parsed.location)    document.getElementById('gm-location').value = parsed.location;
+    if (parsed.distance_km) document.getElementById('gm-dist').value = parsed.distance_km;
+    if (parsed.finish_time) document.getElementById('gm-time').value = parsed.finish_time;
+    if (parsed.note)        document.getElementById('gm-note').value = parsed.note;
+    statusEl.textContent = '✓ 解析成功，請確認並補全資訊'; statusEl.style.color = 'var(--ce)';
+  } catch (e) {
+    statusEl.textContent = '解析失敗：' + e.message; statusEl.style.color = 'var(--crace)';
+  } finally { btn.disabled = false; }
+}
+
 // ── Keyboard ──────────────────────────────────────────────────────────────────
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { closePanel(); closeImport(); closeAI(); }
+  if (e.key === 'Escape') { closePanel(); closeImport(); closeAI(); closeGoalModal(); }
   if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') saveEntry();
 });
 
-Object.assign(window, { doSignIn, switchView, calMov, openPanel, closePanel, saveEntry, delEntry, setRpe, setType, setStat, togWk, calcLoad, openImport, closeImport, handleImportFile, confirmImport, openAI, closeAI, runAICoach });
+Object.assign(window, { doSignIn, switchView, calMov, openPanel, closePanel, saveEntry, delEntry, setRpe, setType, setStat, togWk, calcLoad, openImport, closeImport, handleImportFile, confirmImport, openAI, closeAI, runAICoach, openGoalModal, closeGoalModal, saveGoal, deleteGoal, onGoalUrlInput, parseGoalUrlAI });
 
 init().catch(console.error);
 </script>
