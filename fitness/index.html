@@ -747,6 +747,72 @@ details.coll[open] summary::before { content: '▼'; }
 .gm-save { padding:.42rem 1.2rem; border-radius:var(--r-pill); cursor:pointer; font-family:inherit; background:linear-gradient(135deg,rgba(96,165,250,.22),rgba(96,165,250,.12)); border:1px solid rgba(96,165,250,.38); color:var(--cl); font-size:.8rem; font-weight:700; transition:all var(--t); display:inline-flex; align-items:center; gap:.3rem; }
 .gm-save:hover { background:linear-gradient(135deg,rgba(96,165,250,.38),rgba(96,165,250,.22)); border-color:rgba(96,165,250,.6); color:#fff; }
 
+/* ── Day cell 5-state colors ── */
+.dc.state-done    { background:rgba(52,211,153,.09); box-shadow:0 0 0 1px rgba(52,211,153,.28) inset,0 0 14px rgba(52,211,153,.07); }
+.dc.state-quick   { background:rgba(96,165,250,.07); box-shadow:0 0 0 1px rgba(96,165,250,.28) inset,0 0 14px rgba(96,165,250,.07); }
+.dc.state-partial { background:rgba(251,191,36,.07); box-shadow:0 0 0 1px rgba(251,191,36,.25) inset; }
+.dc.state-skip    { background:rgba(255,255,255,.02); opacity:.45; }
+.dc.state-missed  { background:rgba(248,113,113,.05); box-shadow:0 0 0 1px rgba(248,113,113,.18) inset; opacity:.75; }
+.dc-badge-missed  { background:rgba(248,113,113,.15) !important; color:var(--ci) !important; border-color:rgba(248,113,113,.28) !important; font-size:.55rem !important; }
+.dc.state-quick .dc-badge  { background:rgba(96,165,250,.17); color:var(--cl); border-color:rgba(96,165,250,.3); }
+.dc.state-partial .dc-badge{ background:rgba(251,191,36,.17); color:var(--crace); border-color:rgba(251,191,36,.3); }
+
+/* ── Goal card progress ── */
+.gc-progress { margin-top:.5rem; padding:.5rem .6rem; border-radius:var(--r-sm); background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.07); }
+.gc-progress-title { font-size:.6rem; color:var(--fg2); text-transform:uppercase; letter-spacing:.06em; margin-bottom:.35rem; font-weight:600; }
+.gc-prog-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:.25rem .5rem; }
+.gc-prog-item { font-size:.68rem; color:var(--fg2); }
+.gc-prog-item strong { color:var(--fg); font-weight:700; }
+.gc-prog-acwr { font-size:.65rem; padding:.1rem .4rem; border-radius:var(--r-pill); display:inline-block; margin-top:.25rem; }
+.gc-prog-acwr.safe   { background:rgba(52,211,153,.13); color:var(--ce); border:1px solid rgba(52,211,153,.28); }
+.gc-prog-acwr.high   { background:rgba(248,113,113,.13); color:var(--ci); border:1px solid rgba(248,113,113,.28); }
+.gc-prog-acwr.low    { background:rgba(251,191,36,.12); color:var(--crace); border:1px solid rgba(251,191,36,.25); }
+.goal-card { cursor:pointer; transition:all var(--t); }
+.goal-card:hover { transform:translateY(-2px); box-shadow:var(--glass-shadow-h),var(--glass-hi); }
+
+/* ── Type Manager ── */
+.plan-tools { display:flex; justify-content:flex-end; margin:-.2rem 0 .5rem; }
+.plan-tool-btn {
+  display:inline-flex; align-items:center; gap:.35rem; font-size:.72rem; font-family:inherit;
+  padding:.32rem .75rem; border-radius:var(--r-pill); cursor:pointer;
+  background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12); color:var(--fg2);
+  transition:all var(--t);
+}
+.plan-tool-btn:hover { background:rgba(255,255,255,.11); color:var(--fg); }
+#tm-ov { position:fixed; inset:0; background:rgba(0,0,0,.65); backdrop-filter:blur(6px); z-index:902; display:none; }
+#tm-ov.open { display:block; }
+#tm-modal {
+  position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+  background:rgba(10,10,28,.92); backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px);
+  border:1px solid rgba(255,255,255,.12); border-radius:16px;
+  box-shadow:0 24px 80px rgba(0,0,0,.6),var(--glass-hi);
+  width:min(600px,96vw); max-height:88vh; display:none; flex-direction:column; z-index:903;
+}
+#tm-modal.open { display:flex; }
+#tm-hdr { display:flex; align-items:center; padding:.85rem 1.1rem; border-bottom:1px solid rgba(255,255,255,.08); font-weight:700; font-size:.92rem; background:rgba(255,255,255,.03); border-radius:16px 16px 0 0; }
+#tm-hdr .tm-close { margin-left:auto; background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.12); color:var(--fg2); font-size:1rem; cursor:pointer; width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; transition:all var(--t); }
+#tm-hdr .tm-close:hover { background:rgba(255,255,255,.13); color:var(--fg); }
+#tm-body { flex:1; overflow-y:auto; padding:1rem 1.1rem; }
+.tm-col-hdr { display:grid; grid-template-columns:28px 32px 90px 1fr 1fr 80px 28px; gap:.45rem; align-items:center; font-size:.6rem; color:var(--fg2); text-transform:uppercase; letter-spacing:.05em; padding:0 .5rem .4rem; border-bottom:1px solid rgba(255,255,255,.07); margin-bottom:.45rem; }
+.tm-row { display:grid; grid-template-columns:28px 32px 90px 1fr 1fr 80px 28px; gap:.45rem; align-items:center; padding:.4rem .5rem; border-radius:var(--r-sm); margin-bottom:.32rem; background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.06); transition:background var(--t); }
+.tm-row:hover { background:rgba(255,255,255,.06); }
+.tm-color { width:28px; height:28px; border-radius:6px; border:1px solid rgba(255,255,255,.2); cursor:pointer; padding:0; background:none; overflow:hidden; }
+.tm-icon-prev { font-size:1rem; text-align:center; line-height:1; }
+.tm-key { font-size:.65rem; font-family:monospace; background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.1); border-radius:var(--r-sm); padding:.25rem .45rem; color:var(--fg2); width:100%; }
+.tm-inp { font-size:.75rem; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.1); border-radius:var(--r-sm); padding:.3rem .5rem; color:var(--fg); width:100%; font-family:inherit; transition:border-color var(--t); }
+.tm-inp:focus { outline:none; border-color:rgba(96,165,250,.5); }
+.tm-rest-wrap { display:flex; align-items:center; justify-content:center; gap:.3rem; font-size:.65rem; color:var(--fg2); }
+.tm-rest-wrap input[type=checkbox] { accent-color:var(--cl); width:14px; height:14px; }
+.tm-del-btn { width:26px; height:26px; border-radius:50%; background:rgba(248,113,113,.1); border:1px solid rgba(248,113,113,.25); color:var(--ci); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:.75rem; transition:all var(--t); }
+.tm-del-btn:hover { background:rgba(248,113,113,.25); }
+.tm-del-btn:disabled { opacity:.3; cursor:not-allowed; }
+#tm-add-row { display:flex; align-items:center; gap:.5rem; padding:.5rem 0; margin-top:.3rem; border-top:1px solid rgba(255,255,255,.07); }
+.tm-add-btn { padding:.35rem .85rem; border-radius:var(--r-pill); background:rgba(96,165,250,.15); border:1px solid rgba(96,165,250,.35); color:var(--cl); font-size:.75rem; font-family:inherit; cursor:pointer; transition:all var(--t); white-space:nowrap; }
+.tm-add-btn:hover { background:rgba(96,165,250,.28); }
+#tm-ftr { padding:.75rem 1.1rem; border-top:1px solid rgba(255,255,255,.08); display:flex; gap:.5rem; justify-content:flex-end; background:rgba(255,255,255,.02); border-radius:0 0 16px 16px; }
+.tm-save-btn { padding:.45rem 1.2rem; border-radius:var(--r-pill); background:linear-gradient(135deg,rgba(96,165,250,.28),rgba(96,165,250,.15)); border:1px solid rgba(96,165,250,.45); color:var(--cl); font-size:.82rem; font-family:inherit; font-weight:700; cursor:pointer; transition:all var(--t); }
+.tm-save-btn:hover { background:linear-gradient(135deg,rgba(96,165,250,.45),rgba(96,165,250,.28)); color:#fff; }
+
 /* ── Scrollbar ───────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -781,6 +847,7 @@ details.coll[open] summary::before { content: '▼'; }
 <div id="main">
   <div id="v-plan">
     <div class="lsd-box"><h3>LSD 長跑進程</h3><div class="lsd-dots" id="lsd-dots"></div></div>
+    <div class="plan-tools"><button class="plan-tool-btn" onclick="openTypeManager()"><i class="fi fi-rr-settings"></i> 訓練類型管理</button></div>
     <div id="weeks"></div>
   </div>
   <div id="v-cal" style="display:none">
@@ -834,6 +901,27 @@ details.coll[open] summary::before { content: '▼'; }
     </div>
     <div id="ai-content"></div>
     <div class="ai-note" id="ai-note"></div>
+  </div>
+</div>
+
+<div id="tm-ov" onclick="closeTypeManager()"></div>
+<div id="tm-modal">
+  <div id="tm-hdr">
+    <i class="fi fi-rr-settings" style="margin-right:.5rem;color:var(--cl)"></i> 訓練類型管理
+    <button class="tm-close" onclick="closeTypeManager()"><i class="fi fi-rr-xmark"></i></button>
+  </div>
+  <div id="tm-body">
+    <div class="tm-col-hdr">
+      <span>色</span><span>圖示</span><span>代碼 (key)</span><span>顯示名稱</span><span>圖示 class</span><span style="text-align:center">不需完成</span><span></span>
+    </div>
+    <div id="tm-rows"></div>
+    <div id="tm-add-row">
+      <input class="tm-inp" id="tm-new-key" placeholder="新類型代碼（英文）" style="flex:1">
+      <button class="tm-add-btn" onclick="addTypeRow()"><i class="fi fi-rr-plus"></i> 新增類型</button>
+    </div>
+  </div>
+  <div id="tm-ftr">
+    <button class="tm-save-btn" onclick="saveTypeManager()"><i class="fi fi-rr-check"></i> 儲存</button>
   </div>
 </div>
 
@@ -1017,6 +1105,7 @@ let pDate = null, pRpe = 0, pType = 'easy', pStat = 'done';
 // ── Auth ─────────────────────────────────────────────────────────────────────
 async function init() {
   renderNav('fitness');
+  applyTypeStyles();
   updateRaceCountdown();
   renderPlan();
 
@@ -1035,6 +1124,9 @@ async function activateStore() {
   if (raw) data = raw;
   const rawGoals = await store.readJson('goals.json');
   if (rawGoals) GOALS = rawGoals;
+  const rawTypes = await store.readJson('types.json');
+  if (rawTypes) TYPES = { ...DEFAULT_TYPES, ...rawTypes };
+  applyTypeStyles();
   document.getElementById('auth-ov').classList.add('gone');
   renderAll();
 }
@@ -1066,7 +1158,7 @@ function switchView(v) {
   if (v === 'goals') renderGoals();
 }
 
-function renderAll() { updateStats(); renderPlan(); }
+function renderAll() { applyTypeStyles(); updateStats(); renderPlan(); }
 
 // ── Stats bar ────────────────────────────────────────────────────────────────
 function updateRaceCountdown() {
@@ -1105,6 +1197,31 @@ function avgLoad(days) {
   return t / days;
 }
 
+// ── Training type system ──────────────────────────────────────────────────────
+const DEFAULT_TYPES = {
+  badminton:{ label:'羽球',   icon:'fi-rr-badminton',       color:'#fb923c', isRest:false },
+  rest:     { label:'休息',   icon:'fi-rr-moon',             color:'#64748b', isRest:true  },
+  intervals:{ label:'間歇',   icon:'fi-rr-bolt',             color:'#f87171', isRest:false },
+  strength: { label:'重訓',   icon:'fi-rr-dumbbell-fitness', color:'#a78bfa', isRest:false },
+  easy:     { label:'輕鬆跑', icon:'fi-rr-running',          color:'#34d399', isRest:false },
+  lsd:      { label:'LSD',    icon:'fi-rr-running',          color:'#60a5fa', isRest:false },
+  race:     { label:'比賽',   icon:'fi-rr-trophy',           color:'#fbbf24', isRest:false },
+  other:    { label:'其他',   icon:'fi-rr-plus',             color:'#94a3b8', isRest:false },
+};
+let TYPES = { ...DEFAULT_TYPES };
+let icons = {};
+function applyTypeStyles() {
+  Object.entries(TYPES).forEach(([k, t]) => { icons[k] = `<i class="fi ${t.icon}"></i>`; });
+  let css = '';
+  Object.entries(TYPES).forEach(([k, t]) => {
+    const hex = t.color, r = parseInt(hex.slice(1,3),16), g2 = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+    css += `.dc.type-${k} .dc-bar{background:${hex};box-shadow:0 0 6px rgba(${r},${g2},${b},.5);}\n`;
+  });
+  let s = document.getElementById('dc-type-styles');
+  if (!s) { s = document.createElement('style'); s.id = 'dc-type-styles'; document.head.appendChild(s); }
+  s.textContent = css;
+}
+
 // ── Plan View ────────────────────────────────────────────────────────────────
 function renderPlan() {
   renderLSD();
@@ -1120,25 +1237,41 @@ function renderPlan() {
     const cells = days.map((d, i) => {
       const dateStr = addD(w.start, d.offset);
       const entries = data[dateStr] || [];
-      const entry = entries.find(e => e.status !== 'skip');
+      const entry = entries.find(e => e.status !== 'skip') || (entries.length ? entries[0] : null);
       const isToday = dateStr === tod;
-      const hasDist = entry?.metrics?.distance;
-      const hasDur  = entry?.duration;
+      const isPastDay = dateStr < tod;
 
-      let badge = '', actual = '';
+      let stCls = '', badgeHtml = '', actualHtml = '';
       if (entry) {
-        badge  = `<span class="dc-badge">✓</span>`;
-        actual = hasDist ? `<span class="dc-actual">${entry.metrics.distance}km</span>` :
-                 hasDur  ? `<span class="dc-actual">${entry.duration}'</span>` : '';
+        const hasDist = entry.metrics?.distance;
+        const hasDur  = entry.duration;
+        if (entry.status === 'skip') {
+          stCls = 'state-skip';
+          badgeHtml = '<span class="dc-badge">跳過</span>';
+        } else if (entry.status === 'partial') {
+          stCls = 'state-partial';
+          badgeHtml = '<span class="dc-badge">~ 部分</span>';
+          if (hasDist) actualHtml = `<span class="dc-actual">${hasDist}km</span>`;
+          else if (hasDur) actualHtml = `<span class="dc-actual">${hasDur}'</span>`;
+        } else if (!hasDur && !hasDist) {
+          stCls = 'state-quick';
+          badgeHtml = '<span class="dc-badge"><i class="fi fi-rr-check"></i></span>';
+        } else {
+          stCls = 'state-done';
+          badgeHtml = '<span class="dc-badge"><i class="fi fi-rr-check"></i></span>';
+          if (hasDist) actualHtml = `<span class="dc-actual">${hasDist}km</span>`;
+          else if (hasDur) actualHtml = `<span class="dc-actual">${hasDur}'</span>`;
+        }
+      } else if (isPastDay && !TYPES[d.type]?.isRest) {
+        stCls = 'state-missed';
+        badgeHtml = '<span class="dc-badge dc-badge-missed">未記錄</span>';
       }
-      const icons = { badminton:'', rest:'', intervals:'', strength:'', easy:'', lsd:'', race:'' };
-      const cls = `dc type-${d.type}${isToday ? ' today' : ''}${entry ? ' has-entry' : ''}`;
 
-      return `<div class="${cls}" onclick="openPanel('${dateStr}')">
+      return `<div class="dc type-${d.type} ${stCls}${isToday ? ' today' : ''}" onclick="openPanel('${dateStr}')">
         <span class="dc-date">${dateStr.slice(5)}</span>
-        <span class="dc-icon">${icons[d.type] || '📋'}</span>
+        <span class="dc-icon">${icons[d.type] || ''}</span>
         <span class="dc-label">${d.label}</span>
-        ${badge}${actual}
+        ${badgeHtml}${actualHtml}
         <div class="dc-bar"></div>
       </div>`;
     }).join('');
@@ -1259,7 +1392,9 @@ function renderTrends() {
     }
     return { lbl:`${mon.getMonth()+1}/${mon.getDate()}`, v: load };
   });
-  document.getElementById('ch-load').innerHTML = barChart(wks.map(w=>w.lbl), wks.map(w=>w.v), { color:'var(--cl)' });
+  const chronic4w = avgLoad(28) * 28;
+  const zone = { min: Math.round(chronic4w / 4 * 0.8), max: Math.round(chronic4w / 4 * 1.3) };
+  document.getElementById('ch-load').innerHTML = barChart(wks.map(w=>w.lbl), wks.map(w=>w.v), { color:'var(--cl)', zone });
 
   // cadence
   const r10 = runs.slice(-10);
@@ -1268,10 +1403,11 @@ function renderTrends() {
     '<p style="color:var(--fg2);font-size:.8rem;text-align:center;padding:1rem">尚無跑步資料</p>';
 }
 
-function barChart(lbls, vals, { color='var(--cl)', ref, refLbl }={}) {
+function barChart(lbls, vals, { color='var(--cl)', ref, refLbl, zone }={}) {
   const W=580, H=110, n=lbls.length; if (!n) return '';
-  const max = Math.max(...vals, 1);
+  const max = Math.max(...vals, zone?.max||0, ref||0, 1);
   const bw = Math.max(4, Math.floor((W-20)/n) - 5);
+  const zoneRect = zone ? `<rect x="10" y="${H-(zone.max/max)*H}" width="${W-20}" height="${(zone.max-zone.min)/max*H}" fill="rgba(52,211,153,.08)" stroke="none"/><line x1="10" y1="${H-(zone.max/max)*H}" x2="${W-10}" y2="${H-(zone.max/max)*H}" stroke="rgba(52,211,153,.4)" stroke-dasharray="4 3" stroke-width="1"/><line x1="10" y1="${H-(zone.min/max)*H}" x2="${W-10}" y2="${H-(zone.min/max)*H}" stroke="rgba(52,211,153,.3)" stroke-dasharray="4 3" stroke-width="1"/><text x="${W-10}" y="${H-(zone.max/max)*H-4}" text-anchor="end" font-size="8" fill="rgba(52,211,153,.7)">ACWR 1.3</text><text x="${W-10}" y="${H-(zone.min/max)*H-4}" text-anchor="end" font-size="8" fill="rgba(52,211,153,.7)">0.8</text>` : '';
   const bars = lbls.map((l, i) => {
     const bh = (vals[i]/max)*H, x = 10 + i*((W-20)/n);
     return `<rect x="${x}" y="${H-bh}" width="${bw}" height="${bh}" fill="${color}" rx="2" opacity=".82"/>
@@ -1280,7 +1416,7 @@ function barChart(lbls, vals, { color='var(--cl)', ref, refLbl }={}) {
   }).join('');
   const refLine = ref ? `<line x1="10" y1="${H-(ref/max)*H}" x2="${W-10}" y2="${H-(ref/max)*H}" stroke="var(--crace)" stroke-dasharray="4 3" stroke-width="1"/>
     <text x="${W-10}" y="${H-(ref/max)*H-4}" text-anchor="end" font-size="8" fill="var(--crace)">${refLbl}</text>` : '';
-  return `<svg viewBox="0 0 ${W} ${H+18}">${bars}${refLine}</svg>`;
+  return `<svg viewBox="0 0 ${W} ${H+18}">${zoneRect}${bars}${refLine}</svg>`;
 }
 
 // ── Panel ─────────────────────────────────────────────────────────────────────
@@ -1869,8 +2005,32 @@ function renderGoals() {
     const chipsHtml = chips.map(ch => '<span class="gtag">' + ch + '</span>').join('');
     const meta = ['<span><i class="fi fi-rr-calendar"></i> ' + g.date + '</span>'];
     if (g.location) meta.push('<span><i class="fi fi-rr-marker"></i> ' + g.location + '</span>');
-    if (g.url)      meta.push('<a class="gc-url" href="' + g.url + '" target="_blank" rel="noopener"><i class="fi fi-rr-link"></i> 活動連結</a>');
-    return '<div class="goal-card ' + g.status + '">'
+    if (g.url)      meta.push('<a class="gc-url" href="' + g.url + '" target="_blank" rel="noopener" onclick="event.stopPropagation()"><i class="fi fi-rr-link"></i> 活動連結</a>');
+
+    let progressHtml = '';
+    if (g.status === 'upcoming') {
+      const allEntries = Object.values(data).flat();
+      const recentSess = allEntries.filter(e => e.status !== 'skip').length;
+      const maxLSD = Math.max(0, ...allEntries.filter(e => ['lsd','easy'].includes(e.type)).map(e => e.metrics?.distance || 0));
+      const acute7 = avgLoad(7) * 7;
+      const chronic28 = avgLoad(28) * 28;
+      const acwr = chronic28 > 0 ? (acute7 / (chronic28 / 4)).toFixed(2) : '—';
+      const acwrNum = chronic28 > 0 ? acute7 / (chronic28 / 4) : 0;
+      const acwrCls = acwrNum === 0 ? 'low' : acwrNum >= 0.8 && acwrNum <= 1.3 ? 'safe' : 'high';
+      const weeksDone = new Set(Object.keys(data).map(d => { const dt = new Date(d+'T00:00:00'); return toKey(weekMonday(dt)); })).size;
+      progressHtml = '<div class="gc-progress">'
+        + '<div class="gc-progress-title">備賽進度</div>'
+        + '<div class="gc-prog-grid">'
+        + '<div class="gc-prog-item">訓練週數 <strong>' + weeksDone + '</strong> 週</div>'
+        + '<div class="gc-prog-item">最長 LSD <strong>' + (maxLSD ? maxLSD + 'km' : '—') + '</strong></div>'
+        + '<div class="gc-prog-item">近7天負荷 <strong>' + Math.round(acute7) + '</strong></div>'
+        + '<div class="gc-prog-item">累積訓練 <strong>' + recentSess + ' 次</strong></div>'
+        + '</div>'
+        + '<span class="gc-prog-acwr ' + acwrCls + '">ACWR ' + acwr + ' ' + (acwrCls === 'safe' ? '✓ 安全區間' : acwrCls === 'high' ? '⚠ 過訓風險' : '↓ 負荷偏低') + '</span>'
+        + '</div>';
+    }
+
+    return '<div class="goal-card ' + g.status + '" onclick="openGoalModal(\'' + g.id + '\')">'
       + '<div class="gc-head"><div class="gc-icon-name">'
       + '<span class="gc-sport-icon">' + (sportIcon[g.sport] || sportIcon.other) + '</span>'
       + '<span class="gc-name">' + g.name + '</span>'
@@ -1879,11 +2039,71 @@ function renderGoals() {
       + '<div class="gc-meta">' + meta.join('') + '</div>'
       + (chipsHtml ? '<div class="gc-chips">' + chipsHtml + '</div>' : '')
       + (g.note ? '<div class="gc-note">' + g.note + '</div>' : '')
+      + progressHtml
       + '<div class="gc-actions">'
-      + '<button onclick="openGoalModal('' + g.id + '')"><i class="fi fi-rr-edit"></i> 編輯</button>'
-      + '<button class="gc-del" onclick="deleteGoal('' + g.id + '')"><i class="fi fi-rr-trash"></i> 刪除</button>'
+      + '<button class="gc-del" onclick="event.stopPropagation();deleteGoal(\'' + g.id + '\')"><i class="fi fi-rr-trash"></i> 刪除</button>'
       + '</div></div>';
   }).join('');
+}
+
+// ── Type Manager ──────────────────────────────────────────────────────────────
+function openTypeManager() {
+  renderTypeManager();
+  document.getElementById('tm-ov').classList.add('open');
+  document.getElementById('tm-modal').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeTypeManager() {
+  document.getElementById('tm-ov').classList.remove('open');
+  document.getElementById('tm-modal').classList.remove('open');
+  document.body.style.overflow = '';
+}
+function renderTypeManager() {
+  const rows = document.getElementById('tm-rows');
+  const builtIn = Object.keys(DEFAULT_TYPES);
+  rows.innerHTML = Object.entries(TYPES).map(([key, t]) => {
+    const locked = builtIn.includes(key);
+    return `<div class="tm-row" id="tmr-${key}">
+      <input type="color" class="tm-color" value="${t.color}" id="tmc-${key}" oninput="document.getElementById('tmr-${key}').style.borderColor=this.value+'44'">
+      <span class="tm-icon-prev" id="tmip-${key}"><i class="fi ${t.icon}"></i></span>
+      <input class="tm-inp tm-key" value="${key}" readonly title="類型代碼（不可更改）">
+      <input class="tm-inp" id="tml-${key}" value="${t.label}" placeholder="顯示名稱">
+      <input class="tm-inp" id="tmi-${key}" value="${t.icon}" placeholder="fi-rr-running" oninput="document.getElementById('tmip-${key}').innerHTML='<i class=\\'fi '+this.value+'\\'></i>'">
+      <div class="tm-rest-wrap"><input type="checkbox" id="tmr2-${key}" ${t.isRest ? 'checked' : ''}><label for="tmr2-${key}">不需完成</label></div>
+      <button class="tm-del-btn" ${locked ? 'disabled title="內建類型不可刪除"' : ''} onclick="deleteTypeRow('${key}')"><i class="fi fi-rr-trash"></i></button>
+    </div>`;
+  }).join('');
+}
+function addTypeRow() {
+  const keyInp = document.getElementById('tm-new-key');
+  const key = keyInp.value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+  if (!key) { keyInp.focus(); return; }
+  if (TYPES[key]) { alert('類型代碼已存在：' + key); return; }
+  TYPES[key] = { label: key, icon: 'fi-rr-plus', color: '#94a3b8', isRest: false };
+  keyInp.value = '';
+  renderTypeManager();
+  document.getElementById('tmi-' + key)?.focus();
+}
+function deleteTypeRow(key) {
+  if (!confirm('刪除類型「' + key + '」？')) return;
+  delete TYPES[key];
+  renderTypeManager();
+}
+async function saveTypeManager() {
+  Object.keys(TYPES).forEach(key => {
+    const lbl = document.getElementById('tml-' + key)?.value.trim();
+    const ico = document.getElementById('tmi-' + key)?.value.trim();
+    const clr = document.getElementById('tmc-' + key)?.value;
+    const rest = document.getElementById('tmr2-' + key)?.checked;
+    if (lbl !== undefined) TYPES[key].label = lbl || key;
+    if (ico !== undefined) TYPES[key].icon  = ico  || 'fi-rr-plus';
+    if (clr !== undefined) TYPES[key].color = clr;
+    if (rest !== undefined) TYPES[key].isRest = rest;
+  });
+  if (store) await store.writeJson('types.json', TYPES);
+  applyTypeStyles();
+  renderPlan();
+  closeTypeManager();
 }
 
 function openGoalModal(id) {
@@ -2001,11 +2221,11 @@ async function parseGoalUrlAI() {
 
 // ── Keyboard ──────────────────────────────────────────────────────────────────
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { closePanel(); closeImport(); closeAI(); closeGoalModal(); }
+  if (e.key === 'Escape') { closePanel(); closeImport(); closeAI(); closeGoalModal(); closeTypeManager(); }
   if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') saveEntry();
 });
 
-Object.assign(window, { doSignIn, switchView, calMov, openPanel, closePanel, saveEntry, delEntry, setRpe, setType, setStat, togWk, calcLoad, openImport, closeImport, handleImportFile, confirmImport, openAI, closeAI, runAICoach, openGoalModal, closeGoalModal, saveGoal, deleteGoal, onGoalUrlInput, parseGoalUrlAI });
+Object.assign(window, { doSignIn, switchView, calMov, openPanel, closePanel, saveEntry, delEntry, setRpe, setType, setStat, togWk, calcLoad, openImport, closeImport, handleImportFile, confirmImport, openAI, closeAI, runAICoach, openGoalModal, closeGoalModal, saveGoal, deleteGoal, onGoalUrlInput, parseGoalUrlAI, openTypeManager, closeTypeManager, addTypeRow, deleteTypeRow, saveTypeManager });
 
 init().catch(console.error);
 </script>
