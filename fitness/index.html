@@ -1017,7 +1017,7 @@ details.coll[open] summary::before { content: '▼'; }
 </div>
 
 <script type="module">
-import { waitForGIS, getTokenClient, setToken, loadStoredToken, clearStoredToken, getAccessToken } from '../shared/auth.js';
+import { initAuth, signIn, setToken, loadStoredToken, clearStoredToken, getAccessToken } from '../shared/auth.js';
 import { createDriveStore } from '../shared/drive.js';
 import { renderNav } from '../shared/nav.js';
 
@@ -1109,12 +1109,10 @@ async function init() {
   updateRaceCountdown();
   renderPlan();
 
-  const stored = loadStoredToken();
-  if (stored) {
-    await activateStore();
-  } else {
-    document.getElementById('auth-ov').classList.remove('gone');
-  }
+  await initAuth({
+    onSignedIn: activateStore,
+    onSignOut: () => document.getElementById('auth-ov').classList.remove('gone')
+  });
 }
 
 async function activateStore() {
@@ -1132,13 +1130,7 @@ async function activateStore() {
 }
 
 async function doSignIn() {
-  await waitForGIS();
-  const tc = await getTokenClient();
-  await new Promise(res => {
-    tc.callback = resp => { setToken(resp); res(); };
-    tc.requestAccessToken({ prompt: '' });
-  });
-  await activateStore();
+  await signIn(activateStore);
 }
 
 async function saveYear(y) {
