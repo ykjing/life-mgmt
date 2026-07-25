@@ -1,0 +1,88 @@
+{
+  "raceDate": "2026-08-02",
+  "weeks": [
+    {
+      "id": "w1",
+      "label": "第1週",
+      "start": "2026-06-15",
+      "lsdKm": 11.3,
+      "phase": "build",
+      "lsdNote": "跑走法、低心率"
+    },
+    {
+      "id": "w2",
+      "label": "第2週",
+      "start": "2026-06-22",
+      "lsdKm": 12.6,
+      "phase": "build",
+      "lsdNote": "練習補水/能量膠",
+      "note": "腸胃鏡週（6/25週四）週一停羽球，低渣飲食6/22–6/24",
+      "days": [
+        { "offset": 0, "type": "rest",      "label": "停練",       "note": "羽球停練 低渣飲食Day1" },
+        { "offset": 1, "type": "intervals", "label": "間歇(降載)", "note": "1km×4 嚴守6:45\n下肢重訓重量減半" },
+        { "offset": 2, "type": "rest",      "label": "完全休息",   "note": "低渣Day3 傍晚清腸" },
+        { "offset": 3, "type": "strength",  "label": "鏡檢+上肢",  "note": "腸胃鏡\n晚上：上肢+核心" },
+        { "offset": 4, "type": "easy",      "label": "輕鬆跑",     "note": "5-6km 7:15-7:30配速" },
+        { "offset": 5, "type": "rest",      "label": "大充電",     "note": "長跑前大休息+碳水" },
+        { "offset": 6, "type": "lsd",       "label": "LSD 12.6km", "note": "練習補水/能量膠" }
+      ]
+    },
+    {
+      "id": "w3",
+      "label": "第3週",
+      "start": "2026-06-29",
+      "lsdKm": 14.0,
+      "phase": "build",
+      "lsdNote": "中高里程體感建立"
+    },
+    {
+      "id": "w4",
+      "label": "第4週",
+      "start": "2026-07-06",
+      "lsdKm": 12.0,
+      "phase": "recovery",
+      "lsdNote": "主動縮短、修復關節"
+    },
+    {
+      "id": "w5",
+      "label": "第5週",
+      "start": "2026-07-13",
+      "lsdKm": 16.6,
+      "phase": "peak",
+      "lsdNote": "生涯最高峰、信心解鎖"
+    },
+    {
+      "id": "w6",
+      "label": "第6週",
+      "start": "2026-07-20",
+      "lsdKm": 8.0,
+      "phase": "taper",
+      "lsdNote": "超級減量、保留體力",
+      "days": [
+        { "offset": 0, "type": "badminton", "label": "羽球",       "note": "1-2小時羽球" },
+        { "offset": 1, "type": "rest",      "label": "休息",       "note": "完全休息" },
+        { "offset": 2, "type": "intervals", "label": "間歇(輕量)", "note": "1km×3趟輕鬆跑\n下肢極輕量維持" },
+        { "offset": 3, "type": "strength",  "label": "上肢+核心",  "note": "划船/胸推/肩推+棒式" },
+        { "offset": 4, "type": "easy",      "label": "輕鬆跑",     "note": "4-5km 7:15-7:30配速" },
+        { "offset": 5, "type": "rest",      "label": "大充電",     "note": "長跑前大休息+碳水" },
+        { "offset": 6, "type": "lsd",       "label": "LSD 8.0km",  "note": "超級減量" }
+      ]
+    },
+    {
+      "id": "race",
+      "label": "賽前週",
+      "start": "2026-07-27",
+      "lsdKm": null,
+      "phase": "race",
+      "days": [
+        { "offset": 0, "type": "badminton", "label": "羽球(輕)",  "note": "1小時輕鬆打不拼球" },
+        { "offset": 1, "type": "rest",      "label": "休息",      "note": "完全休息" },
+        { "offset": 2, "type": "easy",      "label": "輕鬆動",    "note": "3km輕鬆動動" },
+        { "offset": 3, "type": "rest",      "label": "拉筋",      "note": "賽前大拉筋伸展" },
+        { "offset": 4, "type": "rest",      "label": "休息",      "note": "完全休息" },
+        { "offset": 5, "type": "rest",      "label": "休息",      "note": "完全休息" },
+        { "offset": 6, "type": "race",      "label": "半馬正賽",  "note": "8/2 半馬\n目標2:30:00" }
+      ]
+    }
+  ]
+}

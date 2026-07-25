@@ -740,7 +740,7 @@ details.coll[open] summary::before { content:'▼'; }
   <div id="ai-sess-hdr">本次訓練 AI 分析<button onclick="closeAISess()"><i class="fi fi-rr-xmark"></i></button></div>
   <div id="ai-sess-body"></div>
   <div id="ai-sess-ftr">
-    <button class="btn-p" disabled>開始 AI 分析</button>
+    <button class="btn-p" id="ai-sess-run-btn" onclick="runAISess()">開始 AI 分析</button>
     <button class="btn-c" onclick="closeAISess()">關閉</button>
   </div>
 </div>
@@ -750,12 +750,12 @@ details.coll[open] summary::before { content:'▼'; }
   <div id="ai-hdr">AI 教練分析<button onclick="closeAI()"><i class="fi fi-rr-xmark"></i></button></div>
   <div id="ai-body">
     <div id="ai-key-row">
-      <label>Anthropic API Key</label>
-      <input type="password" id="ai-key-inp" placeholder="sk-ant-..." autocomplete="off">
+      <label>Gemini API Key</label>
+      <input type="password" id="ai-key-inp" placeholder="AIza..." autocomplete="off">
       <button class="ai-run-btn" id="ai-run-btn" onclick="runAICoach()">開始分析</button>
     </div>
     <div id="ai-content"></div>
-    <div class="ai-note">Key 僅存在本機 localStorage，不會上傳至任何地方。每次分析約消耗 0.02–0.05 USD（Haiku）。</div>
+    <div class="ai-note">Key 僅存在本機 localStorage，不會上傳至任何地方。由 Gemini 2.0 Flash 提供分析。</div>
   </div>
 </div>
 
@@ -1640,7 +1640,10 @@ function togJWk(ws){
 }
 
 // ── AI Session panel ──
+let _aiSessEntry=null,_aiSessDate=null;
+
 function openAISess(entry,date){
+  _aiSessEntry=entry; _aiSessDate=date;
   const tod=todayStr();
 
   // Recent same-type sessions (up to 3, excluding just-saved entry)
@@ -1689,7 +1692,7 @@ function openAISess(entry,date){
         ${w.lsdKm?`<span class="ai-sess-chip">LSD ${w.lsdKm}km</span>`:''}
       </div>`).join('')}
     </div>`:''}
-    <div class="ai-sess-info">AI 將根據以上資料，評估本次訓練表現並建議課表調整方向。確認後再討論 AI 串接方式。</div>
+    <div id="ai-sess-result"></div>
   `;
 
   document.getElementById('ai-sess-modal').classList.add('open');
@@ -1701,6 +1704,66 @@ function closeAISess(){
   document.getElementById('ai-sess-modal').classList.remove('open');
   document.getElementById('ai-sess-ov').classList.remove('open');
   document.body.style.overflow='';
+}
+
+async function runAISess(){
+  const key=localStorage.getItem('ll_ai_key')||'';
+  if(!key){alert('請先在 AI 教練面板中輸入 Gemini API Key');return;}
+  const btn=document.getElementById('ai-sess-run-btn');
+  const result=document.getElementById('ai-sess-result');
+  if(!result)return;
+  btn.disabled=true;
+  result.innerHTML='<div class="ai-loading"><span class="ai-spinner"></span>分析中…</div>';
+
+  const e=_aiSessEntry,date=_aiSessDate;
+  const typeLbl=TYPES[e.type]?.label||e.type;
+  const sametype=SUMMARIES.filter(s=>s.date<date&&s.type===e.type).slice(-3).reverse();
+  const upcoming=PLAN.weeks.filter(w=>addD(w.start,6)>=todayStr()).slice(0,3);
+
+  const sessLines=[
+    `訓練類型：${typeLbl}`,
+    e.duration?`時長：${e.duration} 分鐘`:'',
+    e.rpe?`RPE：${e.rpe}/10`:'',
+    e.load?`訓練負荷（RPE×時長）：${e.load}`:'',
+    e.distance?`距離：${e.distance} km`:'',
+    e.avgPace?`平均配速：${e.avgPace}/km`:'',
+    e.avgHR?`平均心率：${e.avgHR} bpm`:'',
+    e.avgCadence?`平均步頻：${e.avgCadence} spm`:'',
+    e.note?`備注：${e.note}`:'',
+  ].filter(Boolean).join('\n');
+
+  const sameLines=sametype.length
+    ?sametype.map(s=>`- ${s.date} ${TYPES[s.type]?.label||s.type}：${s.distance||'?'}km，配速${s.avgPace||'?'}，HR ${s.avgHR||'?'}bpm，RPE ${s.rpe||'?'}，Load ${s.load||0}`).join('\n')
+    :'（無近期同類型資料）';
+
+  const upcomingLines=upcoming.map(w=>{
+    const days=weekDays(w);
+    return `- ${w.label}（${w.phase}，LSD目標${w.lsdKm||'N/A'}km）：${days.map(d=>d.label).join('、')}`;
+  }).join('\n');
+
+  const prompt=`你是一位專業耐力運動教練，請分析以下這次訓練：
+
+## 本次訓練（${date}）
+${sessLines}
+
+## 近期同類型訓練（最近 ${sametype.length} 次）
+${sameLines}
+
+## 接下來計畫
+${upcomingLines||'（無計畫資料）'}
+
+---
+請用**繁體中文**條列式簡潔回答：
+## 1. 本次表現評估（強度是否適當？配速/HR 是否合理？）
+## 2. 和近期同類型比較的觀察
+## 3. 接下來訓練建議（是否需要調整強度或內容）`;
+
+  try{
+    const text=await callGemini(key,prompt);
+    result.innerHTML=`<div class="ai-resp" style="margin-top:.75rem;padding-top:.75rem;border-top:1px solid rgba(255,255,255,.08)"><p>${mdToHtml(text)}</p></div>`;
+  }catch(err){
+    result.innerHTML=`<div style="color:#ef4444;font-size:.8rem;padding:.5rem">❌ 發生錯誤：${err.message}</div>`;
+  }finally{btn.disabled=false;}
 }
 
 // ── Charts ──
@@ -1942,20 +2005,15 @@ async function parseGoalUrlAI(){
   const statusEl=document.getElementById('gm-parse-status');
   const btn=document.getElementById('gm-parse-btn');
   const key=localStorage.getItem('ll_ai_key')||'';
-  if(!key.startsWith('sk-ant-')){
-    statusEl.textContent='請先在 AI 教練面板中輸入 Anthropic API Key';
+  if(!key){
+    statusEl.textContent='請先在 AI 教練面板中輸入 Gemini API Key';
     statusEl.style.color='var(--crace)';return;
   }
   btn.disabled=true;
   statusEl.innerHTML='解析中…';statusEl.style.color='var(--fg2)';
   const prompt='以下是一個活動或賽事的連結：\n'+url+'\n\n請依據 URL 的 domain、path 與關鍵字，推測活動資訊，並以 JSON 格式回覆（欄位：name、sport（running/hiking/cycling/triathlon/other）、date（YYYY-MM-DD，不確定請留空）、location、distance_km（數字或 null）、finish_time（HH:MM:SS 或空字串）、note）。只回覆 JSON，不含任何說明或 Markdown。';
   try{
-    const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-allow-browser':'true'},
-      body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:300,messages:[{role:'user',content:prompt}]})});
-    if(!resp.ok)throw new Error('HTTP '+resp.status);
-    const result=await resp.json();
-    const text=result.content?.[0]?.text||'';
+    const text=await callGemini(key,prompt);
     const m=text.match(/\{[\s\S]*\}/);
     if(!m)throw new Error('無法解析回應');
     const parsed=JSON.parse(m[0]);
@@ -2372,29 +2430,34 @@ function mdToHtml(text){
     .replace(/(<li>[\s\S]*?<\/li>)(?=\n<li>|\n*$)/g,m=>`<ul>${m}</ul>`)
     .replace(/\n{2,}/g,'</p><p>');
 }
+async function callGemini(key,prompt){
+  const resp=await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,
+    {method:'POST',headers:{'Content-Type':'application/json'},
+     body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{maxOutputTokens:1200,temperature:0.7}})});
+  if(!resp.ok){const err=await resp.json().catch(()=>({}));throw new Error(err?.error?.message||`Gemini API error ${resp.status}`);}
+  const data=await resp.json();
+  return data.candidates?.[0]?.content?.parts?.[0]?.text||'（無回應）';
+}
+
 async function runAICoach(){
   const keyInp=document.getElementById('ai-key-inp');
   const key=keyInp.value.trim();
-  if(!key.startsWith('sk-ant-')){alert('請輸入有效的 Anthropic API Key（以 sk-ant- 開頭）');return;}
+  if(!key){alert('請輸入 Gemini API Key');return;}
   localStorage.setItem('ll_ai_key',key);
   const btn=document.getElementById('ai-run-btn');
   const content=document.getElementById('ai-content');
   btn.disabled=true;
   content.innerHTML='<div class="ai-loading"><span class="ai-spinner"></span>分析中，通常需要 5–15 秒…</div>';
   try{
-    const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-allow-browser':'true'},
-      body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:1200,messages:[{role:'user',content:buildCoachingPrompt()}]})});
-    if(!resp.ok){const err=await resp.json().catch(()=>({}));throw new Error(err?.error?.message||`HTTP ${resp.status}`);}
-    const result=await resp.json();
-    const text=result.content?.[0]?.text||'（無回應）';
+    const text=await callGemini(key,buildCoachingPrompt());
     content.innerHTML=`<div class="ai-resp"><p>${mdToHtml(text)}</p></div>`;
   }catch(e){
     content.innerHTML=`<div style="color:#ef4444;font-size:.8rem;padding:.5rem">發生錯誤：${e.message}</div>`;
   }finally{btn.disabled=false;}
 }
 
-Object.assign(window,{switchView,openPanel,closePanel,saveEntry,delEntry,setRpe,setType,setStat,calcLoad,togWk,togJWk,shiftPlan,resetPlan,quickDone,openImport,triggerFolderPick,closeImport,handleImportFile,confirmImport,openAI,closeAI,runAICoach,closeAISess,setPanelMode,handlePanelFIT,openGoalModal,closeGoalModal,saveGoal,deleteGoal,onGoalUrlInput,parseGoalUrlAI,pickMockDrive,openTypeManager,closeTypeManager,addTypeRow,deleteTypeRow,saveTypeManager});
+Object.assign(window,{switchView,openPanel,closePanel,saveEntry,delEntry,setRpe,setType,setStat,calcLoad,togWk,togJWk,shiftPlan,resetPlan,quickDone,openImport,triggerFolderPick,closeImport,handleImportFile,confirmImport,openAI,closeAI,runAICoach,closeAISess,runAISess,setPanelMode,handlePanelFIT,openGoalModal,closeGoalModal,saveGoal,deleteGoal,onGoalUrlInput,parseGoalUrlAI,pickMockDrive,openTypeManager,closeTypeManager,addTypeRow,deleteTypeRow,saveTypeManager});
 </script>
 </body>
 </html>
