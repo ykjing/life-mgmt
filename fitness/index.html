@@ -1801,29 +1801,46 @@ async function decompressZipEntry(entry) {
   return null;
 }
 
-// ── FIT binary parser (Session message only) ──────────────────────────────────
+// ── FIT binary parser (Session + Record messages) ─────────────────────────────
 function parseGarminFIT(buffer) {
   const view = new DataView(buffer);
-  // Validate header
+  if (buffer.byteLength < 14) return [];
   const hdrSize = view.getUint8(0);
   const magic = String.fromCharCode(view.getUint8(8), view.getUint8(9), view.getUint8(10), view.getUint8(11));
   if (magic !== '.FIT') return [];
 
-  const dataEnd = hdrSize + view.getUint32(4, true);
-  // FIT epoch: Dec 31, 1989 00:00:00 UTC = 631065600s after Unix epoch
-  const FIT_EPOCH = 631065600;
+  const dataEnd = Math.min(hdrSize + view.getUint32(4, true), buffer.byteLength);
+  const FIT_EPOCH = 631065600; // Dec 31, 1989
 
-  const defs = {}; // localMsgType → { globalId, fields:[{num,size}], le, totalSize }
-  const results = [];
+  function rd(off, sz, le) {
+    if (off + sz > buffer.byteLength) return null;
+    if (sz === 1) { const v = view.getUint8(off);                              return v === 0xFF         ? null : v; }
+    if (sz === 2) { const v = le ? view.getUint16(off, true) : view.getUint16(off); return v === 0xFFFF     ? null : v; }
+    if (sz === 4) { const v = le ? view.getUint32(off, true) : view.getUint32(off); return v === 0xFFFFFFFF ? null : v; }
+    return null;
+  }
+
+  const defs = {};
+  const recs = []; // Record messages (gid 20)
+  let session = null;
   let offset = hdrSize;
 
-  while (offset < dataEnd && offset < buffer.byteLength) {
+  function extractFields(def, dataOff) {
+    const m = {}; let p = dataOff;
+    for (const f of def.fields) { m[f.num] = rd(p, f.size, def.le); p += f.size; }
+    return m;
+  }
+
+  while (offset < dataEnd) {
     const hdr = view.getUint8(offset++);
 
     if (hdr & 0x80) {
-      // Compressed timestamp — skip using cached def size
+      // Compressed timestamp data message — process normally, timestamp is in header bits
       const lmt = (hdr >> 5) & 0x03;
       const def = defs[lmt]; if (!def) break;
+      const m = extractFields(def, offset);
+      if (def.gid === 20) recs.push(m);
+      else if (def.gid === 18 && !session) session = m;
       offset += def.totalSize;
       continue;
     }
@@ -1833,77 +1850,101 @@ function parseGarminFIT(buffer) {
     const lmt    = hdr & 0x0F;
 
     if (isDef) {
-      offset++;                                              // reserved
+      offset++;                                                               // reserved
       const le  = view.getUint8(offset++) === 0;
-      const gid = le ? view.getUint16(offset, true) : view.getUint16(offset, false);
-      offset += 2;
+      const gid = le ? view.getUint16(offset, true) : view.getUint16(offset, false); offset += 2;
       const nf  = view.getUint8(offset++);
-      const fields = [];
-      let total = 0;
+      const fields = []; let total = 0;
       for (let i = 0; i < nf; i++) {
-        const num  = view.getUint8(offset++);
-        const size = view.getUint8(offset++);
-        offset++;                                           // base type (unused)
-        fields.push({ num, size });
-        total += size;
+        const num = view.getUint8(offset++), size = view.getUint8(offset++); offset++; // base type
+        fields.push({ num, size }); total += size;
       }
       if (hasDev) {
         const nd = view.getUint8(offset++);
-        for (let i = 0; i < nd; i++) {
-          offset++;                                         // field number
-          total += view.getUint8(offset++);                // size
-          offset++;                                         // dev data index
-        }
+        for (let i = 0; i < nd; i++) { offset++; total += view.getUint8(offset++); offset++; }
       }
       defs[lmt] = { gid, fields, le, totalSize: total };
-
     } else {
-      const def = defs[lmt];
-      if (!def) { offset++; continue; }
-
-      if (def.gid === 18) {
-        // Session message — extract fields we care about
-        const fmap = {};
-        let fOff = offset;
-        for (const f of def.fields) {
-          let v = null;
-          if      (f.size === 1) v = view.getUint8(fOff);
-          else if (f.size === 2) v = def.le ? view.getUint16(fOff, true) : view.getUint16(fOff, false);
-          else if (f.size === 4) v = def.le ? view.getUint32(fOff, true) : view.getUint32(fOff, false);
-          fmap[f.num] = v;
-          fOff += f.size;
-        }
-
-        const sport = fmap[5];               // 1 = running
-        if (sport === 1) {
-          const ts       = fmap[253] ?? fmap[2];
-          const elapsed  = fmap[7];           // scale 1000 → seconds
-          const distRaw  = fmap[9];           // scale 100 → meters
-          const avgHR    = fmap[16] || 0;
-          const avgCad   = fmap[18] || 0;     // strides/min per foot → ×2 for SPM
-
-          const ds = ts ? new Date((ts + FIT_EPOCH) * 1000).toISOString().slice(0, 10) : null;
-          if (!ds) { offset += def.totalSize; continue; }
-
-          const durSec = elapsed ? elapsed / 1000 : 0;
-          const distKm = distRaw ? Math.round(distRaw) / 100000 : 0;
-          let avgPace = '';
-          if (distKm > 0 && durSec > 0) {
-            const spk = durSec / distKm;
-            avgPace = `${Math.floor(spk / 60)}:${p2(Math.round(spk % 60))}`;
-          }
-
-          results.push({
-            date: ds, type: autoRunType(ds, 'running'),
-            duration: Math.round(durSec / 60), distance: Math.round(distKm * 100) / 100,
-            avgPace, avgHR, avgCadence: avgCad ? avgCad * 2 : 0,
-          });
-        }
-      }
+      const def = defs[lmt]; if (!def) { offset++; continue; }
+      const m = extractFields(def, offset);
+      if (def.gid === 20) recs.push(m);
+      else if (def.gid === 18 && !session) session = m;
       offset += def.totalSize;
     }
   }
-  return results;
+
+  if (!session) return [];
+  const sport = session[5];
+  if (sport != null && sport !== 1) return [];                               // 1 = running; null = unknown, accept
+
+  // ── Derive metrics from Record messages (gid 20) ────────────────────────────
+  // Field refs: 253=timestamp, 73/6=enhanced/speed(m/s×1000), 3=hr, 4=cadence(foot rpm),
+  //   53=frac_cad(×128), 39=vert_osc(mm×10), 41=gct(ms×10), 83=vert_ratio(%×100)
+  let lastTs = null, distInt = 0;
+  let hrSum = 0, hrN = 0, spmSum = 0, spmN = 0, spdSum = 0, spdN = 0;
+  let voSum = 0, voN = 0, gctSum = 0, gctN = 0, vrSum = 0, vrN = 0;
+
+  for (const m of recs) {
+    const ts     = m[253];
+    const spdRaw = m[73] ?? m[6];                                            // enhanced_speed preferred
+    const spd    = spdRaw != null ? spdRaw / 1000 : null;                   // m/s
+    const cadRaw = m[4]; const frac = m[53];
+    const spm    = cadRaw != null ? (cadRaw + (frac != null ? frac / 128 : 0)) * 2 : null;
+    const hr     = m[3];
+    const vo     = m[39] != null ? m[39] / 10  : null;                      // mm
+    const gct    = m[41] != null ? m[41] / 10  : null;                      // ms
+    const vr     = m[83] != null ? m[83] / 100 : null;                      // %
+
+    const dt = (ts != null && lastTs != null) ? Math.max(0, ts - lastTs) : 1;
+    if (ts != null) lastTs = ts;
+
+    if (spd != null && spd > 0.5) {                                         // moving only (>1.8 km/h)
+      distInt += spd * dt;
+      spdSum += spd; spdN++;
+      if (hr  != null) { hrSum  += hr;  hrN++;  }
+      if (spm != null) { spmSum += spm; spmN++; }
+      if (vo  != null) { voSum  += vo;  voN++;  }
+      if (gct != null) { gctSum += gct; gctN++; }
+      if (vr  != null) { vrSum  += vr;  vrN++;  }
+    }
+  }
+
+  // ── Build session summary ────────────────────────────────────────────────────
+  const sesTsRaw = session[2] ?? session[253];                              // start_time preferred
+  const elapsed  = session[7];                                              // scale 1000 → s
+  const sesDistR = session[9];                                              // scale 100 → m
+
+  const ds = sesTsRaw ? new Date((sesTsRaw + FIT_EPOCH) * 1000).toISOString().slice(0, 10) : null;
+  if (!ds) return [];
+
+  const durSec  = elapsed ? elapsed / 1000 : 0;
+  const distM   = distInt > 10 ? distInt : (sesDistR ? sesDistR / 100 : 0); // prefer integration
+  const distKm  = Math.round(distM) / 1000;
+
+  const avgSpd  = spdN > 0 ? spdSum  / spdN  : 0;
+  const avgSPM  = spmN > 0 ? spmSum  / spmN  : (session[18] ? session[18] * 2 : 0);
+  const avgHR   = hrN  > 0 ? Math.round(hrSum / hrN) : (session[16] || 0);
+  const avgVO   = voN  > 0 ? Math.round(voSum  / voN  / 10 * 10) / 10 : null; // mm→cm, 1dp
+  const avgGCT  = gctN > 0 ? Math.round(gctSum / gctN)              : null;  // ms
+  const avgVR   = vrN  > 0 ? Math.round(vrSum  / vrN  * 10)  / 10   : null;  // %, 1dp
+  // Stride from speed/cadence (m/s ÷ strides/s = m/stride) → cm to match CSV/manual format
+  const avgStr  = (avgSPM > 0 && avgSpd > 0) ? Math.round(avgSpd / (avgSPM / 60) * 100) : null; // cm
+
+  let avgPace = '';
+  if (distKm > 0.01 && durSec > 0) {
+    const spk = durSec / distKm;
+    avgPace = `${Math.floor(spk / 60)}:${p2(Math.round(spk % 60))}`;
+  }
+
+  return [{
+    date: ds, type: autoRunType(ds, 'running'),
+    duration: Math.round(durSec / 60), distance: Math.round(distKm * 100) / 100,
+    avgPace, avgHR, avgCadence: Math.round(avgSPM),
+    ...(avgStr != null && { avgStrideLength: avgStr }),
+    ...(avgVO  != null && { avgVerticalOscillation: avgVO }),
+    ...(avgGCT != null && { avgGroundContactTime: avgGCT }),
+    ...(avgVR  != null && { avgVerticalRatio: avgVR }),
+  }];
 }
 
 async function extractActivitiesFromZip(buffer) {
