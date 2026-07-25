@@ -1,7 +1,7 @@
 # CLAUDE.md — Fitness Module
 
 ## 位置
-`lifeMgmt/fitness/index.html` — 單一 HTML 頁面，shared 模組在 `../shared/`。
+`fitness/index.html` — 單一 HTML 頁面，shared 模組在 `../shared/`。
 
 ## 模組目標
 1. **訓練日誌** — 記錄每次訓練（日期、類型、時長、強度、備註）
@@ -10,7 +10,7 @@
 
 ## 資料模型
 
-資料存在 Google Drive 的 `fitness/` 資料夾，每年一個 JSON 檔（`2026.json`）。
+資料存在 Google Drive 的 `lifeLog/fitness/` 資料夾，每年一個 JSON 檔（`2026.json`）。
 
 ```json
 {
