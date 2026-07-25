@@ -843,6 +843,23 @@ details.coll[open] summary::before { content: '▼'; }
 .pftr-ai-check span { font-size:.75rem; color:var(--cs); font-weight:500; }
 .pftr-btns { display:flex; gap:.45rem; }
 
+/* ── Demo banner ─────────────────────────────────────────── */
+#demo-banner {
+  display: none;
+  align-items: center; gap: .75rem; padding: .45rem 1.25rem;
+  background: rgba(251,191,36,.08); border-bottom: 1px solid rgba(251,191,36,.22);
+  font-size: .78rem; color: var(--crace);
+}
+#demo-banner strong { font-weight: 700; }
+#demo-banner span { color: var(--fg2); flex: 1; }
+#demo-banner button {
+  padding: .28rem .85rem; border-radius: var(--r-pill); cursor: pointer;
+  background: rgba(251,191,36,.18); border: 1px solid rgba(251,191,36,.4);
+  color: var(--crace); font-size: .75rem; font-weight: 700; font-family: inherit;
+  transition: all var(--t);
+}
+#demo-banner button:hover { background: rgba(251,191,36,.3); }
+
 /* ── Scrollbar ───────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -863,6 +880,12 @@ details.coll[open] summary::before { content: '▼'; }
   <button class="view-tab"        data-v="cal"    onclick="switchView('cal')">訓練日誌</button>
   <button class="view-tab"        data-v="trends" onclick="switchView('trends')">趨勢分析</button>
   <button class="view-tab"        data-v="goals"  onclick="switchView('goals')">目標規劃</button>
+</div>
+
+<div id="demo-banner">
+  <strong>Demo 模式</strong>
+  <span>範例資料，變更不會儲存</span>
+  <button onclick="doSignIn()">登入 Google 啟用完整功能</button>
 </div>
 
 <div id="stats-bar">
@@ -1064,8 +1087,9 @@ details.coll[open] summary::before { content: '▼'; }
 </div>
 
 <script type="module">
-import { initAuth, signIn, setToken, loadStoredToken, clearStoredToken, getAccessToken } from '../shared/auth.js';
+import { initAuth, signIn, loadStoredToken } from '../shared/auth.js';
 import { createDriveStore } from '../shared/drive.js';
+import { createMockStore } from '../shared/mockDrive.js';
 import { renderNav } from '../shared/nav.js';
 
 // ── Plan Definition ──────────────────────────────────────────────────────────
@@ -1145,25 +1169,30 @@ const EX_THU = [
 
 // ── State ────────────────────────────────────────────────────────────────────
 let data = {};
-let store = null;
+let store = null, sharedStore = null;
+let geminiKey = null, isDemoMode = false;
 let calY = new Date().getFullYear(), calM = new Date().getMonth();
 let pDate = null, pRpe = 0, pType = 'easy', pStat = 'done';
 
-// ── Auth ─────────────────────────────────────────────────────────────────────
+// ── Auth / mode ───────────────────────────────────────────────────────────────
 async function init() {
   renderNav('fitness');
   applyTypeStyles();
   updateRaceCountdown();
   renderPlan();
 
-  await initAuth({
-    onSignedIn: activateStore,
-    onSignOut: () => document.getElementById('auth-ov').classList.remove('gone')
-  });
+  const stored = loadStoredToken();
+  if (stored) {
+    await initAuth({ onSignedIn: activateStore, onSignOut: startDemoMode });
+  } else {
+    await startDemoMode();
+  }
 }
 
 async function activateStore() {
-  store = createDriveStore('fitness', () => document.getElementById('auth-ov').classList.remove('gone'));
+  const onAuthFail = () => document.getElementById('auth-ov').classList.remove('gone');
+  sharedStore = createDriveStore('lifeMgmt', onAuthFail);
+  store       = createDriveStore('lifeMgmt/fitness', onAuthFail);
   const y = new Date().getFullYear();
   const raw = await store.readJson(`${y}.json`);
   if (raw) data = raw;
@@ -1171,8 +1200,27 @@ async function activateStore() {
   if (rawGoals) GOALS = rawGoals;
   const rawTypes = await store.readJson('types.json');
   if (rawTypes) TYPES = { ...DEFAULT_TYPES, ...rawTypes };
+  const config = await sharedStore.readJson('config.json');
+  if (config?.geminiKey) geminiKey = config.geminiKey;
   applyTypeStyles();
   document.getElementById('auth-ov').classList.add('gone');
+  renderAll();
+}
+
+async function startDemoMode() {
+  isDemoMode = true;
+  const mockFitness = createMockStore('lifeMgmt/fitness');
+  const mockShared  = createMockStore('lifeMgmt');
+  const y = new Date().getFullYear();
+  const raw = await mockFitness.readJson(`${y}.json`);
+  if (raw) data = raw;
+  const rawGoals = await mockFitness.readJson('goals.json');
+  if (rawGoals) GOALS = rawGoals;
+  const rawTypes = await mockFitness.readJson('types.json');
+  if (rawTypes) TYPES = { ...DEFAULT_TYPES, ...rawTypes };
+  applyTypeStyles();
+  document.getElementById('auth-ov').classList.add('gone');
+  document.getElementById('demo-banner').style.display = '';
   renderAll();
 }
 
@@ -1181,7 +1229,7 @@ async function doSignIn() {
 }
 
 async function saveYear(y) {
-  if (!store) return;
+  if (isDemoMode || !store) return;
   await store.writeJson(`${y}.json`, data, () => alert('儲存失敗'));
 }
 
@@ -1833,24 +1881,50 @@ async function confirmImport() {
 }
 
 // ── AI Coach ──────────────────────────────────────────────────────────────────
-const IS_LOCAL = ['localhost', '127.0.0.1', ''].includes(location.hostname) || location.protocol === 'file:';
-
 function openAI() {
   document.getElementById('ai-modal').classList.add('open');
   document.getElementById('ai-ov').classList.add('open');
   document.body.style.overflow = 'hidden';
   document.getElementById('ai-content').innerHTML = '';
+  renderAIKeyStatus();
+}
 
+function renderAIKeyStatus() {
   const keyRow = document.getElementById('ai-key-row');
-  const note = document.getElementById('ai-note');
-  if (IS_LOCAL) {
-    keyRow.style.display = 'flex';
-    document.getElementById('ai-key-inp').value = localStorage.getItem('ll_ai_key') || '';
-    note.textContent = '本機模式：Gemini key 存在 localStorage，直接呼叫 Gemini API。';
+  const note   = document.getElementById('ai-note');
+  if (isDemoMode) {
+    keyRow.innerHTML = `<span style="font-size:.78rem;color:var(--fg2)">Demo 模式不支援 AI 功能，請登入後設定 Gemini API Key。</span>`;
+    note.textContent = '';
+  } else if (geminiKey) {
+    keyRow.innerHTML = `
+      <span style="font-size:.78rem;color:var(--ce)"><i class="fi fi-rr-check"></i> 已設定 Gemini API Key</span>
+      <button class="ai-run-btn" id="ai-run-btn" onclick="runAICoach()">開始分析</button>
+      <button onclick="changeGeminiKey()" style="padding:.28rem .7rem;border-radius:var(--r-sm);background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);color:var(--fg2);cursor:pointer;font-size:.75rem;font-family:inherit">更換</button>`;
+    note.textContent = 'Key 已儲存於你的 Google Drive（lifeMgmt/config.json）。';
   } else {
-    keyRow.style.display = 'none';
-    note.textContent = '分析由 Gemini 2.0 Flash 提供，透過 Cloudflare Function 代理，API key 不經過瀏覽器。';
+    keyRow.innerHTML = `
+      <label style="font-size:.7rem;color:var(--fg2);white-space:nowrap">Gemini API Key</label>
+      <input type="password" id="ai-key-inp" placeholder="AIza..." autocomplete="off" style="flex:1;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:var(--fg);border-radius:5px;padding:.3rem .5rem;font-size:.78rem;font-family:inherit">
+      <button onclick="saveGeminiKey()" style="padding:.35rem .9rem;border-radius:var(--r-sm);background:linear-gradient(135deg,rgba(96,165,250,.9),rgba(96,165,250,.7));color:#fff;border:1px solid rgba(96,165,250,.4);cursor:pointer;font-size:.8rem;font-weight:700;font-family:inherit">儲存</button>`;
+    note.textContent = 'Key 將儲存於你的 Google Drive，不在任何伺服器。';
   }
+}
+
+async function saveGeminiKey() {
+  const key = document.getElementById('ai-key-inp')?.value.trim();
+  if (!key) return;
+  geminiKey = key;
+  if (sharedStore) {
+    const config = (await sharedStore.readJson('config.json')) || {};
+    config.geminiKey = key;
+    await sharedStore.writeJson('config.json', config);
+  }
+  renderAIKeyStatus();
+}
+
+function changeGeminiKey() {
+  geminiKey = null;
+  renderAIKeyStatus();
 }
 
 function closeAI() {
@@ -1923,10 +1997,7 @@ function closeAISess() {
 }
 
 async function runAISess() {
-  if (IS_LOCAL) {
-    const key = localStorage.getItem('ll_ai_key') || '';
-    if (!key) { alert('請先在 AI 教練面板中輸入 Gemini API Key'); return; }
-  }
+  if (!geminiKey) { alert('請先在 AI 教練面板中設定 Gemini API Key'); return; }
   const btn = document.getElementById('ai-sess-run-btn');
   const result = document.getElementById('ai-sess-result');
   if (!result) return;
@@ -1975,9 +2046,7 @@ ${upcomingLines || '（無計畫資料）'}
 ## 3. 接下來訓練建議`;
 
   try {
-    const text = IS_LOCAL
-      ? await callGeminiDirect(localStorage.getItem('ll_ai_key'), prompt)
-      : await callGeminiViaFunction(prompt);
+    const text = await callGeminiDirect(geminiKey, prompt);
     result.innerHTML = `<div class="ai-resp" style="margin-top:.75rem;padding-top:.75rem;border-top:1px solid rgba(255,255,255,.08)"><p>${mdToHtml(text)}</p></div>`;
   } catch (err) {
     result.innerHTML = `<div style="color:#ef4444;font-size:.8rem;padding:.5rem">❌ 發生錯誤：${err.message}</div>`;
@@ -2098,33 +2167,17 @@ async function callGeminiDirect(key, prompt) {
   return data.candidates?.[0]?.content?.parts?.[0]?.text || '（無回應）';
 }
 
-async function callGeminiViaFunction(prompt) {
-  const resp = await fetch('/api/ai-coach', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ prompt }),
-  });
-  const result = await resp.json();
-  if (!resp.ok) throw new Error(result.error || `HTTP ${resp.status}`);
-  return result.text;
-}
-
 async function runAICoach() {
+  if (!geminiKey) {
+    document.getElementById('ai-content').innerHTML = '<div style="color:var(--fg2);padding:.5rem">請先設定 Gemini API Key</div>';
+    return;
+  }
   const btn = document.getElementById('ai-run-btn');
   const content = document.getElementById('ai-content');
   btn.disabled = true;
   content.innerHTML = '<div class="ai-loading"><span class="ai-spinner"></span>分析中，通常需要 5–15 秒…</div>';
-
   try {
-    let text;
-    if (IS_LOCAL) {
-      const key = document.getElementById('ai-key-inp').value.trim();
-      if (!key) { content.innerHTML = '<div style="color:var(--fg2);padding:.5rem">請輸入 Gemini API Key</div>'; btn.disabled = false; return; }
-      localStorage.setItem('ll_ai_key', key);
-      text = await callGeminiDirect(key, buildCoachingPrompt());
-    } else {
-      text = await callGeminiViaFunction(buildCoachingPrompt());
-    }
+    const text = await callGeminiDirect(geminiKey, buildCoachingPrompt());
     content.innerHTML = `<div class="ai-resp"><p>${mdToHtml(text)}</p></div>`;
   } catch (e) {
     content.innerHTML = `<div style="color:#ef4444;font-size:.8rem;padding:.5rem">❌ 發生錯誤：${e.message}</div>`;
@@ -2352,10 +2405,7 @@ async function parseGoalUrlAI() {
   if (!url) return;
   const statusEl = document.getElementById('gm-parse-status');
   const btn = document.getElementById('gm-parse-btn');
-  if (IS_LOCAL) {
-    const key = localStorage.getItem('ll_ai_key') || '';
-    if (!key) { statusEl.textContent = '請先在 AI 教練面板中輸入 Gemini API Key'; statusEl.style.color = 'var(--crace)'; return; }
-  }
+  if (!geminiKey) { statusEl.textContent = '請先在 AI 教練面板中設定 Gemini API Key'; statusEl.style.color = 'var(--crace)'; return; }
   btn.disabled = true;
   statusEl.innerHTML = '解析中…'; statusEl.style.color = 'var(--fg2)';
   const prompt = '以下是一個活動或賽事的連結：
@@ -2363,9 +2413,7 @@ async function parseGoalUrlAI() {
 
 請依據 URL 的 domain、path 與關鍵字，推測活動資訊，並以 JSON 格式回覆（欄位：name、sport（running/hiking/cycling/triathlon/other）、date（YYYY-MM-DD，不確定請留空）、location、distance_km（數字或 null）、finish_time（HH:MM:SS 或空字串）、note）。只回覆 JSON，不含任何說明或 Markdown。';
   try {
-    const text = IS_LOCAL
-      ? await callGeminiDirect(localStorage.getItem('ll_ai_key'), prompt)
-      : await callGeminiViaFunction(prompt);
+    const text = await callGeminiDirect(geminiKey, prompt);
     const m = text.match(/\{[\s\S]*\}/);
     if (!m) throw new Error('無法解析回應');
     const parsed = JSON.parse(m[0]);
@@ -2388,7 +2436,7 @@ document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') saveEntry();
 });
 
-Object.assign(window, { doSignIn, switchView, calMov, openPanel, closePanel, saveEntry, delEntry, setRpe, setType, setStat, togWk, calcLoad, openImport, closeImport, handleImportFile, confirmImport, openAI, closeAI, runAICoach, openAISess, closeAISess, runAISess, openGoalModal, closeGoalModal, saveGoal, deleteGoal, onGoalUrlInput, parseGoalUrlAI, openTypeManager, closeTypeManager, addTypeRow, deleteTypeRow, saveTypeManager });
+Object.assign(window, { doSignIn, switchView, calMov, openPanel, closePanel, saveEntry, delEntry, setRpe, setType, setStat, togWk, calcLoad, openImport, closeImport, handleImportFile, confirmImport, openAI, closeAI, runAICoach, saveGeminiKey, changeGeminiKey, openAISess, closeAISess, runAISess, openGoalModal, closeGoalModal, saveGoal, deleteGoal, onGoalUrlInput, parseGoalUrlAI, openTypeManager, closeTypeManager, addTypeRow, deleteTypeRow, saveTypeManager });
 
 init().catch(console.error);
 </script>
