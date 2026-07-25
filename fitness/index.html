@@ -931,10 +931,10 @@ details.coll[open] summary::before { content: '▼'; }
   <div id="imp-hdr">匯入 Garmin 資料<button onclick="closeImport()">✕</button></div>
   <div id="imp-body">
     <label class="imp-drop">
-      <input type="file" id="imp-file" accept=".csv,.tcx" onchange="handleImportFile(event)">
+      <input type="file" id="imp-file" accept=".zip,.fit,.csv,.tcx" multiple onchange="handleImportFiles(event)">
       <div class="imp-ico">📂</div>
       <div>點擊選擇 Garmin 匯出檔案</div>
-      <div class="imp-sub">支援 Garmin Connect 活動列表 .csv　或單次活動 .tcx</div>
+      <div class="imp-sub">支援 .zip（自動解壓）、.fit、.tcx、活動列表 .csv，可多選</div>
     </label>
     <div id="imp-preview"></div>
   </div>
@@ -1760,19 +1760,202 @@ function parseGarminTCX(xml) {
   return results;
 }
 
-function handleImportFile(event) {
-  const file = event.target.files[0]; if (!file) return;
-  const ext = file.name.split('.').pop().toLowerCase();
-  const reader = new FileReader();
-  if (ext === 'csv') {
-    reader.onload = e => showImportPreview(parseGarminCSV(e.target.result));
-    reader.readAsText(file, 'UTF-8');
-  } else if (ext === 'tcx') {
-    reader.onload = e => showImportPreview(parseGarminTCX(e.target.result));
-    reader.readAsText(file, 'UTF-8');
-  } else {
-    alert('請上傳 .csv 或 .tcx 格式的 Garmin 匯出檔案');
+// ── Zip reader (pure JS, no library) ─────────────────────────────────────────
+function readZipEntries(buffer) {
+  const view = new DataView(buffer);
+  const entries = [];
+  let offset = 0;
+  while (offset + 30 <= buffer.byteLength) {
+    if (view.getUint32(offset, true) !== 0x04034b50) break;
+    const flags       = view.getUint16(offset + 6,  true);
+    const compression = view.getUint16(offset + 8,  true);
+    const compSize    = view.getUint32(offset + 18, true);
+    const fnLen       = view.getUint16(offset + 26, true);
+    const exLen       = view.getUint16(offset + 28, true);
+    const filename    = new TextDecoder().decode(new Uint8Array(buffer, offset + 30, fnLen));
+    const dataOffset  = offset + 30 + fnLen + exLen;
+    // skip entries using data descriptor (flag bit 3) with unknown compSize
+    if (!(flags & 0x08) && compSize > 0) {
+      entries.push({ filename, compression, data: new Uint8Array(buffer, dataOffset, compSize) });
+    }
+    offset = dataOffset + compSize;
+    if (offset <= dataOffset) break; // guard infinite loop
   }
+  return entries;
+}
+
+async function decompressZipEntry(entry) {
+  if (entry.compression === 0) return new TextDecoder().decode(entry.data);
+  if (entry.compression === 8) {
+    const ds = new DecompressionStream('deflate-raw');
+    const writer = ds.writable.getWriter();
+    const reader = ds.readable.getReader();
+    writer.write(entry.data);
+    writer.close();
+    const chunks = [];
+    for (;;) { const { done, value } = await reader.read(); if (done) break; chunks.push(value); }
+    const out = new Uint8Array(chunks.reduce((s, c) => s + c.length, 0));
+    let pos = 0; for (const c of chunks) { out.set(c, pos); pos += c.length; }
+    return new TextDecoder().decode(out);
+  }
+  return null;
+}
+
+// ── FIT binary parser (Session message only) ──────────────────────────────────
+function parseGarminFIT(buffer) {
+  const view = new DataView(buffer);
+  // Validate header
+  const hdrSize = view.getUint8(0);
+  const magic = String.fromCharCode(view.getUint8(8), view.getUint8(9), view.getUint8(10), view.getUint8(11));
+  if (magic !== '.FIT') return [];
+
+  const dataEnd = hdrSize + view.getUint32(4, true);
+  // FIT epoch: Dec 31, 1989 00:00:00 UTC = 631065600s after Unix epoch
+  const FIT_EPOCH = 631065600;
+
+  const defs = {}; // localMsgType → { globalId, fields:[{num,size}], le, totalSize }
+  const results = [];
+  let offset = hdrSize;
+
+  while (offset < dataEnd && offset < buffer.byteLength) {
+    const hdr = view.getUint8(offset++);
+
+    if (hdr & 0x80) {
+      // Compressed timestamp — skip using cached def size
+      const lmt = (hdr >> 5) & 0x03;
+      const def = defs[lmt]; if (!def) break;
+      offset += def.totalSize;
+      continue;
+    }
+
+    const isDef  = (hdr >> 6) & 1;
+    const hasDev = (hdr >> 5) & 1;
+    const lmt    = hdr & 0x0F;
+
+    if (isDef) {
+      offset++;                                              // reserved
+      const le  = view.getUint8(offset++) === 0;
+      const gid = le ? view.getUint16(offset, true) : view.getUint16(offset, false);
+      offset += 2;
+      const nf  = view.getUint8(offset++);
+      const fields = [];
+      let total = 0;
+      for (let i = 0; i < nf; i++) {
+        const num  = view.getUint8(offset++);
+        const size = view.getUint8(offset++);
+        offset++;                                           // base type (unused)
+        fields.push({ num, size });
+        total += size;
+      }
+      if (hasDev) {
+        const nd = view.getUint8(offset++);
+        for (let i = 0; i < nd; i++) {
+          offset++;                                         // field number
+          total += view.getUint8(offset++);                // size
+          offset++;                                         // dev data index
+        }
+      }
+      defs[lmt] = { gid, fields, le, totalSize: total };
+
+    } else {
+      const def = defs[lmt];
+      if (!def) { offset++; continue; }
+
+      if (def.gid === 18) {
+        // Session message — extract fields we care about
+        const fmap = {};
+        let fOff = offset;
+        for (const f of def.fields) {
+          let v = null;
+          if      (f.size === 1) v = view.getUint8(fOff);
+          else if (f.size === 2) v = def.le ? view.getUint16(fOff, true) : view.getUint16(fOff, false);
+          else if (f.size === 4) v = def.le ? view.getUint32(fOff, true) : view.getUint32(fOff, false);
+          fmap[f.num] = v;
+          fOff += f.size;
+        }
+
+        const sport = fmap[5];               // 1 = running
+        if (sport === 1) {
+          const ts       = fmap[253] ?? fmap[2];
+          const elapsed  = fmap[7];           // scale 1000 → seconds
+          const distRaw  = fmap[9];           // scale 100 → meters
+          const avgHR    = fmap[16] || 0;
+          const avgCad   = fmap[18] || 0;     // strides/min per foot → ×2 for SPM
+
+          const ds = ts ? new Date((ts + FIT_EPOCH) * 1000).toISOString().slice(0, 10) : null;
+          if (!ds) { offset += def.totalSize; continue; }
+
+          const durSec = elapsed ? elapsed / 1000 : 0;
+          const distKm = distRaw ? Math.round(distRaw) / 100000 : 0;
+          let avgPace = '';
+          if (distKm > 0 && durSec > 0) {
+            const spk = durSec / distKm;
+            avgPace = `${Math.floor(spk / 60)}:${p2(Math.round(spk % 60))}`;
+          }
+
+          results.push({
+            date: ds, type: autoRunType(ds, 'running'),
+            duration: Math.round(durSec / 60), distance: Math.round(distKm * 100) / 100,
+            avgPace, avgHR, avgCadence: avgCad ? avgCad * 2 : 0,
+          });
+        }
+      }
+      offset += def.totalSize;
+    }
+  }
+  return results;
+}
+
+async function extractActivitiesFromZip(buffer) {
+  const entries = readZipEntries(buffer);
+  const find = ext => entries.find(e => e.filename.toLowerCase().endsWith(ext));
+  const tcx = find('.tcx'), fit = find('.fit'), csv = find('.csv');
+
+  if (tcx) {
+    const text = await decompressZipEntry(tcx);
+    if (text) return parseGarminTCX(text);
+  }
+  if (fit) {
+    const ds = new DecompressionStream('deflate-raw');
+    // .fit may be STORED (no compression) — handle both
+    if (fit.compression === 0) return parseGarminFIT(fit.data.buffer.slice(fit.data.byteOffset, fit.data.byteOffset + fit.data.byteLength));
+    const chunks = []; const writer = ds.writable.getWriter(); const reader = ds.readable.getReader();
+    writer.write(fit.data); writer.close();
+    for (;;) { const { done, value } = await reader.read(); if (done) break; chunks.push(value); }
+    const out = new Uint8Array(chunks.reduce((s, c) => s + c.length, 0));
+    let pos = 0; for (const c of chunks) { out.set(c, pos); pos += c.length; }
+    return parseGarminFIT(out.buffer);
+  }
+  if (csv) {
+    const text = await decompressZipEntry(csv);
+    if (text) return parseGarminCSV(text);
+  }
+  return [];
+}
+
+async function handleImportFiles(event) {
+  const files = [...event.target.files]; if (!files.length) return;
+  document.getElementById('imp-preview').innerHTML =
+    '<p style="color:var(--fg2);font-size:.82rem;text-align:center;padding:1.5rem">處理中…</p>';
+  document.getElementById('imp-ftr').style.display = 'none';
+
+  const all = [];
+  for (const file of files) {
+    const ext = file.name.split('.').pop().toLowerCase();
+    try {
+      if (ext === 'zip') {
+        all.push(...await extractActivitiesFromZip(await file.arrayBuffer()));
+      } else if (ext === 'fit') {
+        all.push(...parseGarminFIT(await file.arrayBuffer()));
+      } else if (ext === 'csv') {
+        all.push(...parseGarminCSV(await file.text()));
+      } else if (ext === 'tcx') {
+        all.push(...parseGarminTCX(await file.text()));
+      }
+    } catch (e) { console.warn('import error', file.name, e); }
+  }
+  all.sort((a, b) => a.date.localeCompare(b.date));
+  showImportPreview(all);
 }
 
 const TCLR = { badminton:'#f97316',rest:'#4b5563',intervals:'#ef4444',strength:'#8b5cf6',easy:'#10b981',lsd:'#3b82f6',race:'#f59e0b' };
@@ -2392,7 +2575,7 @@ document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') saveEntry();
 });
 
-Object.assign(window, { doSignIn, switchView, calMov, openPanel, closePanel, saveEntry, delEntry, setRpe, setType, setStat, togWk, calcLoad, openImport, closeImport, handleImportFile, confirmImport, openAI, closeAI, runAICoach, saveGeminiKey, changeGeminiKey, openAISess, closeAISess, runAISess, openGoalModal, closeGoalModal, saveGoal, deleteGoal, onGoalUrlInput, parseGoalUrlAI, openTypeManager, closeTypeManager, addTypeRow, deleteTypeRow, saveTypeManager });
+Object.assign(window, { doSignIn, switchView, calMov, openPanel, closePanel, saveEntry, delEntry, setRpe, setType, setStat, togWk, calcLoad, openImport, closeImport, handleImportFiles, confirmImport, openAI, closeAI, runAICoach, saveGeminiKey, changeGeminiKey, openAISess, closeAISess, runAISess, openGoalModal, closeGoalModal, saveGoal, deleteGoal, onGoalUrlInput, parseGoalUrlAI, openTypeManager, closeTypeManager, addTypeRow, deleteTypeRow, saveTypeManager });
 
 init().catch(console.error);
 </script>
