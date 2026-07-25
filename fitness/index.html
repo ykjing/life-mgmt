@@ -949,9 +949,7 @@ details.coll[open] summary::before { content: '▼'; }
 <div id="ai-modal">
   <div id="ai-hdr">AI 教練分析<button onclick="closeAI()">✕</button></div>
   <div id="ai-body">
-    <div style="display:flex;justify-content:flex-end;margin-bottom:.8rem">
-      <button class="ai-run-btn" id="ai-run-btn" onclick="runAICoach()">開始分析</button>
-    </div>
+    <div id="ai-key-row"></div>
     <div id="ai-content"></div>
     <div class="ai-note" id="ai-note"></div>
   </div>
@@ -2074,6 +2072,7 @@ function openAI() {
 function renderAIKeyStatus() {
   const keyRow = document.getElementById('ai-key-row');
   const note   = document.getElementById('ai-note');
+  keyRow.style.display = 'flex';
   if (isDemoMode) {
     keyRow.innerHTML = `<span style="font-size:.78rem;color:var(--fg2)">Demo 模式不支援 AI 功能，請登入後設定 Gemini API Key。</span>`;
     note.textContent = '';
