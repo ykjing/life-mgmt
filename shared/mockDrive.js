@@ -15,7 +15,9 @@
  *   await store.readJson('plan.json');   // fetches /MockDrive/lifeMgmt/fitness/plan.json
  */
 
-const MOCK_BASE = '/MockDrive/';
+// Relative to shared/mockDrive.js → ../MockDrive/ = lifeMgmt/MockDrive/
+// Works on both file:// (local) and https:// (Cloudflare Pages).
+const MOCK_BASE = new URL('../MockDrive/', import.meta.url).href;
 
 export function createMockStore(folderPath) {
   const prefix = MOCK_BASE + folderPath.replace(/\/$/, '') + '/';

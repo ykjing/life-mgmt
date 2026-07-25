@@ -1210,7 +1210,6 @@ async function activateStore() {
 async function startDemoMode() {
   isDemoMode = true;
   const mockFitness = createMockStore('lifeMgmt/fitness');
-  const mockShared  = createMockStore('lifeMgmt');
   const y = new Date().getFullYear();
   const raw = await mockFitness.readJson(`${y}.json`);
   if (raw) data = raw;
@@ -1220,7 +1219,7 @@ async function startDemoMode() {
   if (rawTypes) TYPES = { ...DEFAULT_TYPES, ...rawTypes };
   applyTypeStyles();
   document.getElementById('auth-ov').classList.add('gone');
-  document.getElementById('demo-banner').style.display = '';
+  document.getElementById('demo-banner').style.display = 'flex';
   renderAll();
 }
 
@@ -2408,10 +2407,7 @@ async function parseGoalUrlAI() {
   if (!geminiKey) { statusEl.textContent = '請先在 AI 教練面板中設定 Gemini API Key'; statusEl.style.color = 'var(--crace)'; return; }
   btn.disabled = true;
   statusEl.innerHTML = '解析中…'; statusEl.style.color = 'var(--fg2)';
-  const prompt = '以下是一個活動或賽事的連結：
-' + url + '
-
-請依據 URL 的 domain、path 與關鍵字，推測活動資訊，並以 JSON 格式回覆（欄位：name、sport（running/hiking/cycling/triathlon/other）、date（YYYY-MM-DD，不確定請留空）、location、distance_km（數字或 null）、finish_time（HH:MM:SS 或空字串）、note）。只回覆 JSON，不含任何說明或 Markdown。';
+  const prompt = '以下是一個活動或賽事的連結：\n' + url + '\n\n請依據 URL 的 domain、path 與關鍵字，推測活動資訊，並以 JSON 格式回覆（欄位：name、sport（running/hiking/cycling/triathlon/other）、date（YYYY-MM-DD，不確定請留空）、location、distance_km（數字或 null）、finish_time（HH:MM:SS 或空字串）、note）。只回覆 JSON，不含任何說明或 Markdown。';
   try {
     const text = await callGeminiDirect(geminiKey, prompt);
     const m = text.match(/\{[\s\S]*\}/);
