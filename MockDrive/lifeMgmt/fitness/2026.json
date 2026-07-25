@@ -1,0 +1,86 @@
+{
+  "2026-06-15": [
+    {"id":"m001","time":"08:30","type":"badminton","duration":90,"rpe":6,"load":540,"status":"done","note":"","metrics":{}}
+  ],
+  "2026-06-17": [
+    {"id":"m002","time":"07:00","type":"intervals","duration":60,"rpe":8,"load":480,"status":"done","note":"4趟1km 5:49/6:03/6:00/5:50 + 下肢重訓","metrics":{"distance":5.01,"avgPace":"5:58","avgHR":152,"avgCadence":146}}
+  ],
+  "2026-06-18": [
+    {"id":"m003","time":"19:00","type":"strength","duration":25,"rpe":6,"load":150,"status":"done","note":"","metrics":{"strengthDone":["row","press","shoulder","plank"]}}
+  ],
+  "2026-06-19": [
+    {"id":"m004","time":"07:00","type":"easy","duration":40,"rpe":5,"load":200,"status":"done","note":"","metrics":{"distance":5.5,"avgPace":"7:16","avgHR":138}}
+  ],
+  "2026-06-21": [
+    {"id":"m005","time":"07:00","type":"lsd","duration":75,"rpe":6,"load":450,"status":"done","note":"跑走法、低心率 11.3km","metrics":{"distance":11.3,"avgPace":"6:38","avgHR":148}}
+  ],
+  "2026-06-23": [
+    {"id":"m006","time":"07:00","type":"intervals","duration":45,"rpe":7,"load":315,"status":"done","note":"降載：3趟1km 6:45配速 重量減半","metrics":{"distance":3.8,"avgPace":"6:38","avgHR":148}}
+  ],
+  "2026-06-25": [
+    {"id":"m007","time":"20:00","type":"strength","duration":25,"rpe":5,"load":125,"status":"done","note":"腸胃鏡後晚上上肢","metrics":{"strengthDone":["row","press","shoulder","plank"]}}
+  ],
+  "2026-06-26": [
+    {"id":"m008","time":"07:00","type":"easy","duration":42,"rpe":5,"load":210,"status":"done","note":"","metrics":{"distance":5.6,"avgPace":"7:30","avgHR":135}}
+  ],
+  "2026-06-28": [
+    {"id":"m009","time":"06:30","type":"lsd","duration":82,"rpe":6,"load":492,"status":"done","note":"練習補水/能量膠 12.6km","metrics":{"distance":12.6,"avgPace":"6:30","avgHR":150}}
+  ],
+  "2026-06-29": [
+    {"id":"m010","time":"09:00","type":"badminton","duration":90,"rpe":6,"load":540,"status":"done","note":"","metrics":{}}
+  ],
+  "2026-07-01": [
+    {"id":"m011","time":"07:00","type":"intervals","duration":60,"rpe":8,"load":480,"status":"done","note":"4趟1km 5:50配速 + 下肢重訓","metrics":{"distance":5.5,"avgPace":"5:45","avgHR":158,"avgCadence":148}}
+  ],
+  "2026-07-02": [
+    {"id":"m012","time":"19:30","type":"strength","duration":30,"rpe":6,"load":180,"status":"done","note":"","metrics":{"strengthDone":["row","press","shoulder","plank"]}}
+  ],
+  "2026-07-03": [
+    {"id":"m013","time":"07:00","type":"easy","duration":45,"rpe":5,"load":225,"status":"done","note":"","metrics":{"distance":6.0,"avgPace":"7:12","avgHR":140}}
+  ],
+  "2026-07-05": [
+    {"id":"m014","time":"06:30","type":"lsd","duration":88,"rpe":6,"load":528,"status":"done","note":"中高里程體感建立 14.0km","metrics":{"distance":14.0,"avgPace":"6:17","avgHR":152}}
+  ],
+  "2026-07-06": [
+    {"id":"m015","time":"09:00","type":"badminton","duration":90,"rpe":5,"load":450,"status":"done","note":"","metrics":{}}
+  ],
+  "2026-07-08": [
+    {"id":"m016","time":"07:00","type":"intervals","duration":50,"rpe":7,"load":350,"status":"done","note":"3趟1km 輕量 + 下肢重訓","metrics":{"distance":4.2,"avgPace":"6:40","avgHR":150,"avgCadence":144}}
+  ],
+  "2026-07-09": [
+    {"id":"m017","time":"19:30","type":"strength","duration":30,"rpe":5,"load":150,"status":"done","note":"","metrics":{"strengthDone":["row","press","shoulder","plank"]}}
+  ],
+  "2026-07-10": [
+    {"id":"m018","time":"07:00","type":"easy","duration":38,"rpe":4,"load":152,"status":"done","note":"","metrics":{"distance":4.8,"avgPace":"7:55","avgHR":132}}
+  ],
+  "2026-07-12": [
+    {"id":"m019","time":"06:30","type":"lsd","duration":75,"rpe":5,"load":375,"status":"done","note":"主動縮短、修復關節 12.0km","metrics":{"distance":12.0,"avgPace":"6:15","avgHR":145}}
+  ],
+  "2026-07-13": [
+    {"id":"m020","time":"09:00","type":"badminton","duration":90,"rpe":6,"load":540,"status":"done","note":"","metrics":{}}
+  ],
+  "2026-07-15": [
+    {"id":"m021","time":"07:00","type":"intervals","duration":65,"rpe":9,"load":585,"status":"done","note":"4趟1km 5:45配速 + 下肢重訓","metrics":{"distance":5.8,"avgPace":"5:42","avgHR":162,"avgCadence":150}}
+  ],
+  "2026-07-16": [
+    {"id":"m022","time":"19:30","type":"strength","duration":30,"rpe":6,"load":180,"status":"done","note":"","metrics":{"strengthDone":["row","press","shoulder","plank"]}}
+  ],
+  "2026-07-17": [
+    {"id":"m023","time":"07:00","type":"easy","duration":50,"rpe":5,"load":250,"status":"done","note":"","metrics":{"distance":6.8,"avgPace":"7:22","avgHR":138}}
+  ],
+  "2026-07-19": [
+    {"id":"m024","time":"06:00","type":"lsd","duration":105,"rpe":7,"load":735,"status":"done","note":"生涯最高峰、信心解鎖 16.6km","metrics":{"distance":16.6,"avgPace":"6:19","avgHR":155}}
+  ],
+  "2026-07-20": [
+    {"id":"m025","time":"09:00","type":"badminton","duration":90,"rpe":6,"load":540,"status":"done","note":"","metrics":{}}
+  ],
+  "2026-07-22": [
+    {"id":"m026","time":"07:00","type":"intervals","duration":45,"rpe":7,"load":315,"status":"done","note":"輕量版：3趟1km 6:45配速 + 下肢極輕量","metrics":{"distance":3.8,"avgPace":"6:38","avgHR":148,"avgCadence":144}}
+  ],
+  "2026-07-23": [
+    {"id":"m027","time":"19:30","type":"strength","duration":25,"rpe":5,"load":125,"status":"done","note":"減量週輕量上肢","metrics":{"strengthDone":["row","press","shoulder","plank"]}}
+  ],
+  "2026-07-24": [
+    {"id":"m028","time":"07:00","type":"easy","duration":32,"rpe":4,"load":128,"status":"done","note":"","metrics":{"distance":4.2,"avgPace":"7:36","avgHR":130}}
+  ]
+}

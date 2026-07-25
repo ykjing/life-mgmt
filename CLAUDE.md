@@ -9,36 +9,49 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Repository Structure
 
 ```
-action_rd/
-├── lifeMgmt/               ← all active code lives here
-│   ├── index.html          ← home/hub page (links to all modules)
-│   ├── shared/
-│   │   ├── style.css       ← design tokens + shared components
-│   │   ├── nav.js          ← renderNav(activePage) — site-wide nav bar
-│   │   ├── auth.js         ← Google OAuth helpers
-│   │   └── drive.js        ← createDriveStore(folderName, onAuthFailure)
-│   ├── lifeLog/
-│   │   ├── index.html      ← Life Log module (active)
-│   │   └── CLAUDE.md       ← module-level context for Life Log sessions
-│   ├── fitness/
-│   │   ├── index.html      ← Fitness module (placeholder)
-│   │   └── CLAUDE.md       ← module-level context for Fitness sessions
-│   └── assets/
-│       ├── index.html      ← Assets module (placeholder)
-│       └── CLAUDE.md       ← module-level context for Assets sessions
-└── data/
-    └── 2026.json           ← offline test data (from original local-file version)
+lifeMgmt/               ← repo root
+├── index.html          ← home/hub page (links to all modules)
+├── shared/
+│   ├── style.css       ← design tokens + shared components
+│   ├── nav.js          ← renderNav(activePage) — site-wide nav bar
+│   ├── auth.js         ← Google OAuth helpers
+│   ├── drive.js        ← createDriveStore(folderPath, onAuthFailure)
+│   └── mockDrive.js    ← createMockStore(folderPath) — HTTP fetch from MockDrive/
+├── MockDrive/          ← static demo data, committed to repo, served by Cloudflare
+│   └── lifeMgmt/       ← mirrors the Google Drive folder structure exactly
+│       ├── config.json
+│       ├── fitness/
+│       │   ├── 2026.json
+│       │   ├── goals.json
+│       │   └── plan.json
+│       └── lifeLog/
+├── lifeLog/
+│   ├── index.html      ← Life Log module
+│   └── CLAUDE.md
+├── fitness/
+│   ├── index.html      ← Fitness module
+│   └── CLAUDE.md
+└── assets/
+    ├── index.html      ← Assets module
+    └── CLAUDE.md
 ```
 
 ## Running the App
 
-Open any `index.html` directly in Chrome/Edge (deployed on Cloudflare — no local server needed for production). Auth uses Google OAuth 2.0; data is stored in Google Drive.
+**Production:** Deployed on Cloudflare Pages. Open `https://<domain>/fitness/` etc. No server needed.
+
+**Local dev:** Must use a local HTTP server — `fetch()` is blocked on `file://` protocol.
+```
+cd lifeMgmt/
+npx serve .
+# then open http://localhost:3000/fitness/
+```
 
 No lint, build, or test commands.
 
 ## Shared Infrastructure
 
-All modules import from `lifeMgmt/shared/`:
+All modules import from `shared/`:
 
 ### `style.css`
 Design tokens (dark theme):
@@ -58,31 +71,130 @@ Prepends the site-wide nav bar (`<div class="site-nav">`) to `<body>`.
 
 ### `auth.js`
 ```js
-import { initAuth, signIn, signOut, getAccessToken, ensureToken } from '../shared/auth.js';
-await initAuth({ onSignedIn, onSignOut });
+import { loadStoredToken, initAuth, signIn, signOut, getAccessToken } from '../shared/auth.js';
 ```
 Handles Google OAuth token lifecycle, localStorage caching, and silent refresh.
 
 ### `drive.js`
 ```js
 import { createDriveStore } from '../shared/drive.js';
-const store = createDriveStore('folderName', onAuthFailure);
-// store.readJson(filename)  → parsed object, {} if not found
+// folderPath supports nested paths — resolves/creates each level in Drive
+const store       = createDriveStore('lifeMgmt/fitness', onAuthFailure);
+const sharedStore = createDriveStore('lifeMgmt', onAuthFailure);
+// store.readJson(filename)       → parsed object, or null if not found
 // store.writeJson(filename, data, onError)
 // store.clearCache()
 ```
-Each module creates its own store instance scoped to its own Drive folder.
+
+### `mockDrive.js`
+```js
+import { createMockStore } from '../shared/mockDrive.js';
+// Reads static JSON from MockDrive/ via HTTP fetch (requires a local server or Cloudflare Pages)
+// Writes are held in memory only — lost on refresh, suitable for demo
+const store = createMockStore('lifeMgmt/fitness');
+// Same interface: store.readJson / store.writeJson / store.clearCache
+```
+
+## Drive Folder Structure
+
+All modules store data under `lifeMgmt/` in the user's Google Drive. `MockDrive/` in the repo mirrors this structure exactly:
+
+```
+Drive root (or MockDrive/)
+└── lifeMgmt/
+    ├── config.json              ← shared: { "geminiKey": "..." }
+    ├── fitness/
+    │   ├── 2026.json            ← training entries keyed by date
+    │   ├── goals.json
+    │   └── plan.json
+    ├── lifeLog/
+    │   └── 2026.json
+    └── assets/
+        ├── holdings.json
+        └── transactions_2026.json
+```
+
+## Three-Mode Init Pattern
+
+Every module's `init()` follows this pattern — logged-in users get Google Drive, everyone else gets MockDrive demo mode:
+
+```js
+import { loadStoredToken, initAuth, signIn } from '../shared/auth.js';
+import { createDriveStore } from '../shared/drive.js';
+import { createMockStore }  from '../shared/mockDrive.js';
+
+let store = null, sharedStore = null;
+let geminiKey = null, isDemoMode = false;
+
+async function init() {
+  renderNav('moduleName');
+  // ... render static UI ...
+
+  const stored = loadStoredToken();
+  if (stored) {
+    await initAuth({ onSignedIn: activateStore, onSignOut: startDemoMode });
+  } else {
+    await startDemoMode();
+  }
+}
+
+async function activateStore() {
+  const onAuthFail = () => document.getElementById('auth-ov').classList.remove('gone');
+  sharedStore = createDriveStore('lifeMgmt', onAuthFail);
+  store       = createDriveStore('lifeMgmt/moduleName', onAuthFail);
+  // read data from Drive ...
+  const config = await sharedStore.readJson('config.json');
+  if (config?.geminiKey) geminiKey = config.geminiKey;
+  document.getElementById('auth-ov').classList.add('gone');
+  renderAll();
+}
+
+async function startDemoMode() {
+  isDemoMode = true;
+  const mockStore = createMockStore('lifeMgmt/moduleName');
+  // read data from MockDrive ...
+  document.getElementById('auth-ov').classList.add('gone');
+  document.getElementById('demo-banner').style.display = 'flex';
+  renderAll();
+}
+
+async function doSignIn() {
+  await signIn(activateStore);
+}
+```
+
+**HTML requirements:**
+```html
+<!-- Auth overlay: starts hidden, shown only when Drive auth fails -->
+<div id="auth-ov" class="gone auth-overlay">
+  <button onclick="doSignIn()">登入 Google</button>
+</div>
+
+<!-- Demo banner: starts hidden, shown in demo mode -->
+<div id="demo-banner">
+  <strong>Demo 模式</strong>
+  <span>範例資料，變更不會儲存</span>
+  <button onclick="doSignIn()">登入 Google 啟用完整功能</button>
+</div>
+```
+
+**Key rules:**
+- `auth-ov` must start with `class="gone"` in HTML — only shown on Drive auth failure
+- `demo-banner` CSS default is `display: none` — set `style.display = 'flex'` to show
+- `saveData()` must check `if (isDemoMode) return` to skip writes in demo mode
+- MockDrive writes are in-memory only; real Drive writes go through `store.writeJson()`
+- Gemini key comes from `sharedStore.readJson('config.json')` — shared across all modules
 
 ## Modules
 
 ### Life Log (`lifeLog/`)
-Records daily events tagged M/A/I/F/H. Data stored as `{year}.json` per year in Drive folder `lifeLog/`. See `lifeLog/CLAUDE.md` for full detail.
+Records daily events tagged M/A/I/F/H. Data: `lifeMgmt/lifeLog/{year}.json`. See `lifeLog/CLAUDE.md`.
 
 ### Fitness (`fitness/`)
-Exercise tracking, training load (ACWR), competition planning. Data in Drive folder `fitness/`. Currently a placeholder. See `fitness/CLAUDE.md`.
+Exercise tracking, training load (ACWR), competition planning. Data: `lifeMgmt/fitness/`. See `fitness/CLAUDE.md`.
 
 ### Assets (`assets/`)
-Portfolio tracking with manual price snapshots. Two files: `holdings.json` + `transactions_{year}.json` in Drive folder `assets/`. Currently a placeholder. See `assets/CLAUDE.md`.
+Portfolio tracking with manual price snapshots. Data: `lifeMgmt/assets/`. See `assets/CLAUDE.md`.
 
 ## Data Model (Life Log)
 
@@ -103,6 +215,8 @@ Tag semantics: **M** = Moment, **A** = Action, **I** = Insight, **F** = Feeling,
 - No external libraries or CDN dependencies
 - Each module has its own CLAUDE.md — open a separate Claude Code session per module to avoid context bloat
 
-## Test Data
+## Demo Data (MockDrive)
 
-`data/2026.json` contains real entries from the original local-file version of the app. Same JSON schema as the current Life Log data model. Use for offline testing.
+`MockDrive/lifeMgmt/` contains static JSON files committed to the repo. These are served by Cloudflare Pages as demo data for unauthenticated users, and by `npx serve .` for local dev.
+
+To add or update demo data for a module, edit the corresponding file under `MockDrive/lifeMgmt/{module}/`. The structure must mirror the Google Drive folder layout exactly.
