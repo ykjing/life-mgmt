@@ -4,12 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Life Management (lifeMgmt)** — a personal life tracking web app with three modules: Life Log, Fitness, and Assets. Deployed via Cloudflare. No build step, no framework, no server required — plain HTML/CSS/JavaScript.
+**Life Log** — a personal life tracking web app with three modules: Moment, Fitness, and Assets. Deployed via Cloudflare. No build step, no framework, no server required — plain HTML/CSS/JavaScript.
 
 ## Repository Structure
 
 ```
-lifeMgmt/               ← repo root
+(repo root)
 ├── index.html          ← home/hub page (links to all modules)
 ├── shared/
 │   ├── style.css       ← design tokens + shared components
@@ -18,15 +18,15 @@ lifeMgmt/               ← repo root
 │   ├── drive.js        ← createDriveStore(folderPath, onAuthFailure)
 │   └── mockDrive.js    ← createMockStore(folderPath) — HTTP fetch from MockDrive/
 ├── MockDrive/          ← static demo data, committed to repo, served by Cloudflare
-│   └── lifeMgmt/       ← mirrors the Google Drive folder structure exactly
+│   └── lifeLog/        ← mirrors the Google Drive folder structure exactly
 │       ├── config.json
 │       ├── fitness/
 │       │   ├── 2026.json
 │       │   ├── goals.json
 │       │   └── plan.json
-│       └── lifeLog/
-├── lifeLog/
-│   ├── index.html      ← Life Log module
+│       └── moment/
+├── moment/
+│   ├── index.html      ← Moment module (daily log)
 │   └── CLAUDE.md
 ├── fitness/
 │   ├── index.html      ← Fitness module
@@ -42,7 +42,6 @@ lifeMgmt/               ← repo root
 
 **Local dev:** Must use a local HTTP server — `fetch()` is blocked on `file://` protocol.
 ```
-cd lifeMgmt/
 npx serve .
 # then open http://localhost:3000/fitness/
 ```
@@ -65,9 +64,9 @@ Provides: `.btn`, `.btn.primary`, `.toast`, `.auth-overlay`, `.site-nav`
 ### `nav.js`
 ```js
 import { renderNav } from '../shared/nav.js';
-renderNav('lifeLog'); // or 'fitness' | 'assets' | ''
+renderNav('moment'); // or 'fitness' | 'assets' | ''
 ```
-Prepends the site-wide nav bar (`<div class="site-nav">`) to `<body>`.
+Prepends the site-wide nav bar (`<div class="site-nav">`) to `<body>`. Brand shows "Life Log".
 
 ### `auth.js`
 ```js
@@ -79,8 +78,8 @@ Handles Google OAuth token lifecycle, localStorage caching, and silent refresh.
 ```js
 import { createDriveStore } from '../shared/drive.js';
 // folderPath supports nested paths — resolves/creates each level in Drive
-const store       = createDriveStore('lifeMgmt/fitness', onAuthFailure);
-const sharedStore = createDriveStore('lifeMgmt', onAuthFailure);
+const store       = createDriveStore('lifeLog/fitness', onAuthFailure);
+const sharedStore = createDriveStore('lifeLog', onAuthFailure);
 // store.readJson(filename)       → parsed object, or null if not found
 // store.writeJson(filename, data, onError)
 // store.clearCache()
@@ -91,23 +90,23 @@ const sharedStore = createDriveStore('lifeMgmt', onAuthFailure);
 import { createMockStore } from '../shared/mockDrive.js';
 // Reads static JSON from MockDrive/ via HTTP fetch (requires a local server or Cloudflare Pages)
 // Writes are held in memory only — lost on refresh, suitable for demo
-const store = createMockStore('lifeMgmt/fitness');
+const store = createMockStore('lifeLog/fitness');
 // Same interface: store.readJson / store.writeJson / store.clearCache
 ```
 
 ## Drive Folder Structure
 
-All modules store data under `lifeMgmt/` in the user's Google Drive. `MockDrive/` in the repo mirrors this structure exactly:
+All modules store data under `lifeLog/` in the user's Google Drive. `MockDrive/` in the repo mirrors this structure exactly:
 
 ```
 Drive root (or MockDrive/)
-└── lifeMgmt/
+└── lifeLog/
     ├── config.json              ← shared: { "geminiKey": "..." }
     ├── fitness/
     │   ├── 2026.json            ← training entries keyed by date
     │   ├── goals.json
     │   └── plan.json
-    ├── lifeLog/
+    ├── moment/
     │   └── 2026.json
     └── assets/
         ├── holdings.json
@@ -140,8 +139,8 @@ async function init() {
 
 async function activateStore() {
   const onAuthFail = () => document.getElementById('auth-ov').classList.remove('gone');
-  sharedStore = createDriveStore('lifeMgmt', onAuthFail);
-  store       = createDriveStore('lifeMgmt/moduleName', onAuthFail);
+  sharedStore = createDriveStore('lifeLog', onAuthFail);
+  store       = createDriveStore('lifeLog/moduleName', onAuthFail);
   // read data from Drive ...
   const config = await sharedStore.readJson('config.json');
   if (config?.geminiKey) geminiKey = config.geminiKey;
@@ -151,7 +150,7 @@ async function activateStore() {
 
 async function startDemoMode() {
   isDemoMode = true;
-  const mockStore = createMockStore('lifeMgmt/moduleName');
+  const mockStore = createMockStore('lifeLog/moduleName');
   // read data from MockDrive ...
   document.getElementById('auth-ov').classList.add('gone');
   document.getElementById('demo-banner').style.display = 'flex';
@@ -187,16 +186,16 @@ async function doSignIn() {
 
 ## Modules
 
-### Life Log (`lifeLog/`)
-Records daily events tagged M/A/I/F/H. Data: `lifeMgmt/lifeLog/{year}.json`. See `lifeLog/CLAUDE.md`.
+### Moment (`moment/`)
+Records daily events tagged M/A/I/F/H. Data: `lifeLog/moment/{year}.json`. See `moment/CLAUDE.md`.
 
 ### Fitness (`fitness/`)
-Exercise tracking, training load (ACWR), competition planning. Data: `lifeMgmt/fitness/`. See `fitness/CLAUDE.md`.
+Exercise tracking, training load (ACWR), competition planning. Data: `lifeLog/fitness/`. See `fitness/CLAUDE.md`.
 
 ### Assets (`assets/`)
-Portfolio tracking with manual price snapshots. Data: `lifeMgmt/assets/`. See `assets/CLAUDE.md`.
+Portfolio tracking with manual price snapshots. Data: `lifeLog/assets/`. See `assets/CLAUDE.md`.
 
-## Data Model (Life Log)
+## Data Model (Moment)
 
 ```json
 {
@@ -217,6 +216,6 @@ Tag semantics: **M** = Moment, **A** = Action, **I** = Insight, **F** = Feeling,
 
 ## Demo Data (MockDrive)
 
-`MockDrive/lifeMgmt/` contains static JSON files committed to the repo. These are served by Cloudflare Pages as demo data for unauthenticated users, and by `npx serve .` for local dev.
+`MockDrive/lifeLog/` contains static JSON files committed to the repo. These are served by Cloudflare Pages as demo data for unauthenticated users, and by `npx serve .` for local dev.
 
-To add or update demo data for a module, edit the corresponding file under `MockDrive/lifeMgmt/{module}/`. The structure must mirror the Google Drive folder layout exactly.
+To add or update demo data for a module, edit the corresponding file under `MockDrive/lifeLog/{module}/`. The structure must mirror the Google Drive folder layout exactly.

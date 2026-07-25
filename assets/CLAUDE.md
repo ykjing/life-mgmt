@@ -4,7 +4,7 @@
 The **Assets** module is one page of the Life Management app. It tracks personal investment holdings, records price snapshots manually, and shows portfolio overview, P&L, and net worth trend.
 
 ## How to run
-Open `lifeMgmt/assets/index.html` directly in Chrome/Edge (deployed via Cloudflare). No build step. The module uses the same Google Drive backend and shared auth as the other modules.
+Open `assets/index.html` directly in Chrome/Edge (deployed via Cloudflare). No build step. The module uses the same Google Drive backend and shared auth as the other modules.
 
 ## Shared infrastructure (read these files)
 All shared code lives in `../shared/`:
@@ -137,7 +137,7 @@ function genId() { return Date.now().toString(36) + Math.random().toString(36).s
 5. **新增交易 modal** — action type, asset, date, qty/price/fee or amount (for dividends)
 6. **淨值走勢** — line chart from snapshots array (Canvas), showing total TWD over time
 
-## Auth overlay pattern (copy from lifeLog)
+## Auth overlay pattern (copy from moment)
 ```html
 <div class="auth-overlay show" id="authOverlay">
   <div class="auth-box">
@@ -194,5 +194,5 @@ function showToast(msg) {
 ## Current file state
 `index.html` is a placeholder — replace it entirely with the real implementation. Keep `<link rel="stylesheet" href="../shared/style.css">` and `<script type="module">`.
 
-## Reference: lifeLog implementation
-For patterns on modal structure, entry forms, and Drive read/write flow, read `../lifeLog/index.html`. The assets module follows the same conventions.
+## Reference: moment implementation
+For patterns on modal structure, entry forms, and Drive read/write flow, read `../moment/index.html`. The assets module follows the same conventions.
