@@ -1191,8 +1191,8 @@ async function init() {
 
 async function activateStore() {
   const onAuthFail = () => document.getElementById('auth-ov').classList.remove('gone');
-  sharedStore = createDriveStore('lifeMgmt', onAuthFail);
-  store       = createDriveStore('lifeMgmt/fitness', onAuthFail);
+  sharedStore = createDriveStore('lifeLog', onAuthFail);
+  store       = createDriveStore('lifeLog/fitness', onAuthFail);
   const y = new Date().getFullYear();
   const raw = await store.readJson(`${y}.json`);
   if (raw) data = raw;
@@ -1209,7 +1209,7 @@ async function activateStore() {
 
 async function startDemoMode() {
   isDemoMode = true;
-  const mockFitness = createMockStore('lifeMgmt/fitness');
+  const mockFitness = createMockStore('lifeLog/fitness');
   const y = new Date().getFullYear();
   const raw = await mockFitness.readJson(`${y}.json`);
   if (raw) data = raw;
@@ -1899,7 +1899,7 @@ function renderAIKeyStatus() {
       <span style="font-size:.78rem;color:var(--ce)"><i class="fi fi-rr-check"></i> 已設定 Gemini API Key</span>
       <button class="ai-run-btn" id="ai-run-btn" onclick="runAICoach()">開始分析</button>
       <button onclick="changeGeminiKey()" style="padding:.28rem .7rem;border-radius:var(--r-sm);background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);color:var(--fg2);cursor:pointer;font-size:.75rem;font-family:inherit">更換</button>`;
-    note.textContent = 'Key 已儲存於你的 Google Drive（lifeMgmt/config.json）。';
+    note.textContent = 'Key 已儲存於你的 Google Drive（lifeLog/config.json）。';
   } else {
     keyRow.innerHTML = `
       <label style="font-size:.7rem;color:var(--fg2);white-space:nowrap">Gemini API Key</label>

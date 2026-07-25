@@ -61,7 +61,7 @@ async function resolveFolderPath(folderPath) {
 
 /**
  * createDriveStore(folderPath, onAuthFailure)
- * folderPath supports nested paths: 'lifeMgmt' or 'lifeMgmt/fitness'
+ * folderPath supports nested paths: 'lifeLog' or 'lifeLog/fitness'
  * Returns { readJson, writeJson, clearCache }
  */
 export function createDriveStore(folderPath, onAuthFailure) {

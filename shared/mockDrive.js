@@ -11,11 +11,11 @@
  *
  * Usage:
  *   import { createMockStore } from '../shared/mockDrive.js';
- *   const store = createMockStore('lifeMgmt/fitness');
- *   await store.readJson('plan.json');   // fetches /MockDrive/lifeMgmt/fitness/plan.json
+ *   const store = createMockStore('lifeLog/fitness');
+ *   await store.readJson('plan.json');   // fetches /MockDrive/lifeLog/fitness/plan.json
  */
 
-// Relative to shared/mockDrive.js → ../MockDrive/ = lifeMgmt/MockDrive/
+// Relative to shared/mockDrive.js → ../MockDrive/ = (repo root)/MockDrive/
 // Works on both file:// (local) and https:// (Cloudflare Pages).
 const MOCK_BASE = new URL('../MockDrive/', import.meta.url).href;
 
