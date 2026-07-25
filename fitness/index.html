@@ -2201,11 +2201,17 @@ async function runAISess() {
     e.metrics?.avgPace ? `平均配速：${e.metrics.avgPace}/km` : '',
     e.metrics?.avgHR ? `平均心率：${e.metrics.avgHR} bpm` : '',
     e.metrics?.avgCadence ? `平均步頻：${e.metrics.avgCadence} spm` : '',
+    e.metrics?.avgStrideLength ? `平均步幅：${e.metrics.avgStrideLength} cm` : '',
+    e.metrics?.avgGroundContactTime ? `觸地時間：${e.metrics.avgGroundContactTime} ms` : '',
+    e.metrics?.avgVerticalOscillation ? `垂直振幅：${e.metrics.avgVerticalOscillation} cm` : '',
+    e.metrics?.avgVerticalRatio ? `垂直效率：${e.metrics.avgVerticalRatio}%` : '',
     e.note ? `備注：${e.note}` : '',
   ].filter(Boolean).join('\n');
 
-  const sameLines = sametype.length
-    ? sametype.map(s => `- ${TYPES[s.type]?.label || s.type}：${s.metrics?.distance || '?'}km，配速${s.metrics?.avgPace || '?'}，HR ${s.metrics?.avgHR || '?'}bpm，RPE ${s.rpe || '?'}，Load ${s.load || 0}`).join('\n')
+  const allSess = buildSessionArray(data).filter(s => s.type === e.type && s.id !== e.id);
+  const recentSame = recentSessions(allSess);
+  const sameLines = recentSame.length
+    ? recentSame.map(s => `- ${s.date}：${fmtSession(s)}`).join('\n')
     : '（無近期同類型資料）';
 
   const upcomingLines = upcomingWeeks.map(w => `- ${w.label}（${w.phase}，LSD目標${w.lsdKm || 'N/A'}km）`).join('\n');
@@ -2215,7 +2221,7 @@ async function runAISess() {
 ## 本次訓練（${date}）
 ${sessLines}
 
-## 近期同類型訓練（最近 ${sametype.length} 次）
+## 近期同類型訓練（最近 20 次或 3 個月，共 ${recentSame.length} 次）
 ${sameLines}
 
 ## 接下來計畫
@@ -2233,6 +2239,41 @@ ${upcomingLines || '（無計畫資料）'}
   } catch (err) {
     result.innerHTML = `<div style="color:#ef4444;font-size:.8rem;padding:.5rem">❌ 發生錯誤：${err.message}</div>`;
   } finally { btn.disabled = false; }
+}
+
+function buildSessionArray(sourceData) {
+  return Object.entries(sourceData)
+    .filter(([k]) => !k.startsWith('_'))
+    .flatMap(([date, entries]) =>
+      (entries || [])
+        .filter(e => e.type !== 'rest' && e.status !== 'skip')
+        .map(e => ({ id: e.id, date, type: e.type, duration: e.duration, rpe: e.rpe, load: e.load, note: e.note, ...e.metrics }))
+    )
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function fmtSession(s) {
+  return [
+    s.distance   && `${s.distance}km`,
+    s.avgPace    && `配速 ${s.avgPace}`,
+    s.avgHR      && `HR ${s.avgHR}bpm`,
+    s.avgCadence && `步頻 ${s.avgCadence}spm`,
+    s.avgStrideLength        && `步幅 ${s.avgStrideLength}cm`,
+    s.avgGroundContactTime   && `GCT ${s.avgGroundContactTime}ms`,
+    s.avgVerticalOscillation && `振幅 ${s.avgVerticalOscillation}cm`,
+    s.avgVerticalRatio       && `垂直效率 ${s.avgVerticalRatio}%`,
+    s.rpe  && `RPE ${s.rpe}`,
+    s.load && `Load ${s.load}`,
+  ].filter(Boolean).join('，');
+}
+
+// 最近 20 次 或 3 個月，取涵蓋較多的那個
+function recentSessions(sessions) {
+  const cutoff = new Date(); cutoff.setMonth(cutoff.getMonth() - 3);
+  const cutStr = cutoff.toISOString().slice(0, 10);
+  const by20  = sessions.slice(-20);
+  const by3mo = sessions.filter(s => s.date >= cutStr);
+  return by3mo.length >= by20.length ? by3mo : by20;
 }
 
 function buildCoachingPrompt() {
@@ -2264,17 +2305,11 @@ function buildCoachingPrompt() {
     return `- ${w.label}（${w.phase}）：完成${done} 跳過${skip} 部分${partial} / 週負荷 ${load}`;
   }).join('\n');
 
-  // Last 3 runs metrics
-  const runs = [];
-  Object.entries(data).sort().forEach(([date, arr]) => {
-    arr.forEach(e => {
-      if (['easy','lsd','intervals'].includes(e.type) && e.status !== 'skip')
-        runs.push({ date, type: e.type, duration: e.duration || 0, ...e.metrics });
-    });
-  });
-  const last3 = runs.slice(-3);
-  const runLines = last3.length
-    ? last3.map(r => `- ${r.date} ${r.type}：${r.distance || '?'}km，配速 ${r.avgPace || '?'}，HR ${r.avgHR || '?'}bpm，步頻 ${r.avgCadence || '?'}spm`).join('\n')
+  // Recent runs (last 20 or 3 months, whichever covers more)
+  const allRuns = buildSessionArray(data).filter(s => ['easy','lsd','intervals','cardio','sport'].includes(s.type));
+  const recentRuns = recentSessions(allRuns);
+  const runLines = recentRuns.length
+    ? recentRuns.map(r => `- ${r.date} ${r.type}：${fmtSession(r)}`).join('\n')
     : '（尚無跑步資料）';
 
   // Upcoming 3 weeks plan
@@ -2300,7 +2335,7 @@ function buildCoachingPrompt() {
 ## 已完成訓練週摘要
 ${weekLines || '（無資料）'}
 
-## 最近 3 次跑步數據
+## 近期跑步數據（最近 20 次或 3 個月，共 ${recentRuns.length} 次）
 ${runLines}
 
 ## 接下來課表（含本週）
