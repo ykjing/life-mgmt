@@ -2129,7 +2129,12 @@ function parseGarminFIT(buffer) {
   // ── Decode Record messages → elapsed-time objects ────────────────────────────
   const { recs, startTs } = decodeRecs(rawRecs);
   const sesTsRaw = session[2] ?? session[253];
-  const ds = sesTsRaw ? new Date((sesTsRaw + FIT_EPOCH) * 1000).toISOString().slice(0, 10) : null;
+  let ds = null, tim = '';
+  if (sesTsRaw) {
+    const d = new Date((sesTsRaw + FIT_EPOCH) * 1000);
+    ds  = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    tim = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  }
   if (!ds) return [];
 
   const durSec = session[7] ? session[7] / 1000 : 0;
@@ -2204,7 +2209,7 @@ function parseGarminFIT(buffer) {
   }
 
   return [{
-    date: ds, type: runType,
+    date: ds, time: tim, type: runType,
     duration: Math.round(durSec / 60), distance: Math.round(distKm * 100) / 100,
     avgPace, avgHR, avgCadence: Math.round(avgSPM),
     ...(avgStr != null && { avgStrideLength: avgStr }),
@@ -2321,7 +2326,7 @@ async function confirmImport() {
     const existing = (data[a.date]||[])[0];
     data[a.date] = [{
       id: existing?.id || (Date.now().toString(36)+Math.random().toString(36).slice(2,5)),
-      time: existing?.time || '',
+      time: existing?.time || a.time || '',
       type: a.type, duration: a.duration,
       rpe: existing?.rpe||0, load: a.duration*(existing?.rpe||0),
       status: 'done', note: existing?.note||'',
