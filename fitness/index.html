@@ -2129,7 +2129,10 @@ function parseGarminFIT(buffer) {
   // ── Decode Record messages → elapsed-time objects ────────────────────────────
   const { recs, startTs } = decodeRecs(rawRecs);
   const sesTsRaw = session[2] ?? session[253];
-  const ds = sesTsRaw ? new Date((sesTsRaw + FIT_EPOCH) * 1000).toISOString().slice(0, 10) : null;
+  const ds = sesTsRaw ? (() => {
+    const d = new Date((sesTsRaw + FIT_EPOCH) * 1000);
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  })() : null;
   if (!ds) return [];
 
   const durSec = session[7] ? session[7] / 1000 : 0;
