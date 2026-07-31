@@ -565,6 +565,8 @@ details.coll[open] summary::before { content: '▼'; }
 .imp-drop input[type=file] { display: none; }
 .imp-ico { font-size: 2.2rem; }
 .imp-sub { font-size: .7rem; margin-top: .1rem; color: var(--fg2); }
+.imp-drop-row { display: flex; gap: .75rem; }
+.imp-drop-row .imp-drop { flex: 1; }
 .imp-tbl { width: 100%; border-collapse: collapse; font-size: .73rem; margin-top: .75rem; }
 .imp-tbl th {
   text-align: left; padding: .3rem .4rem;
@@ -930,12 +932,20 @@ details.coll[open] summary::before { content: '▼'; }
 <div id="imp-modal">
   <div id="imp-hdr">匯入 Garmin 資料<button onclick="closeImport()">✕</button></div>
   <div id="imp-body">
-    <label class="imp-drop">
-      <input type="file" id="imp-file" accept=".zip,.fit,.csv,.tcx" multiple onchange="handleImportFiles(event)">
-      <div class="imp-ico">📂</div>
-      <div>點擊選擇 Garmin 匯出檔案</div>
-      <div class="imp-sub">支援 .zip（自動解壓）、.fit、.tcx、活動列表 .csv，可多選</div>
-    </label>
+    <div class="imp-drop-row">
+      <label class="imp-drop">
+        <input type="file" id="imp-file" accept=".zip,.fit,.csv,.tcx" multiple onchange="handleImportFiles(event)">
+        <div class="imp-ico">📄</div>
+        <div>選擇檔案</div>
+        <div class="imp-sub">.zip / .fit / .tcx / .csv，可多選</div>
+      </label>
+      <label class="imp-drop">
+        <input type="file" id="imp-folder" webkitdirectory multiple onchange="handleImportFiles(event)">
+        <div class="imp-ico">📁</div>
+        <div>選擇資料夾</div>
+        <div class="imp-sub">自動掃描資料夾內所有活動</div>
+      </label>
+    </div>
     <div id="imp-preview"></div>
   </div>
   <div id="imp-ftr">
@@ -2237,7 +2247,10 @@ async function extractActivitiesFromZip(buffer) {
 }
 
 async function handleImportFiles(event) {
-  const files = [...event.target.files]; if (!files.length) return;
+  const VALID = new Set(['zip', 'fit', 'csv', 'tcx']);
+  const files = [...event.target.files]
+    .filter(f => VALID.has(f.name.split('.').pop().toLowerCase()));
+  if (!files.length) return;
   document.getElementById('imp-preview').innerHTML =
     '<p style="color:var(--fg2);font-size:.82rem;text-align:center;padding:1.5rem">處理中…</p>';
   document.getElementById('imp-ftr').style.display = 'none';
