@@ -62,6 +62,12 @@
 | `avgGroundContactTime` | ms | FIT field 41（÷10） |
 | `avgVerticalOscillation` | cm | FIT field 39（mm÷10） |
 | `avgVerticalRatio` | % | FIT field 83（÷100） |
+| `segmentType` | `'continuous'` / `'interval'` | FIT 主段切割後設定 |
+| `splits` | 陣列 | continuous: `[{km, pace, avgHR, spm, strideM}]`；run_walk: `[{km, runPace, runAvgHR, runSpm, walkAvgHR, walkPct}]` |
+| `reps` | 陣列 | interval: work/recovery 交叉 `[{kind:'work', rep, distM, pace, avgHR, peakHR, gctMs}, {kind:'recovery', durationS, startHR, endHR, dropHR}, ...]` |
+| `repCount` | 整數 | interval work 趟數 |
+| `workAvgPace` | `M:SS` 字串 | interval work 趟平均配速 |
+| `workAvgHR` | bpm | interval work 趟平均心率 |
 
 其他運動的 metrics 欄位（組數、重量等）為自由擴充。
 
@@ -116,6 +122,7 @@ function weekLoad(data, isoWeek) {
 
 **讀取的訊息類型：**
 - **Session（gid 18）**：sport、elapsed time、distance、avgHR、avgCadence
+- **Lap（gid 19）**：start_time、elapsed、distance、avgHR、avgCadence — 供間歇分圈
 - **Record（gid 20）**：逐點 HR、cadence、speed、running dynamics
 
 **關鍵計算原則：**
@@ -123,7 +130,6 @@ function weekLoad(data, isoWeek) {
 - 步幅 = speed ÷ (spm/60)，單位 cm（比 FIT step_length field 可靠）
 - 步頻：FIT 存單腳 rpm，`(cadence + frac_cad/128) × 2` = spm
 - 壓縮時間戳記 record（hdr & 0x80）正常解析，不跳過
-- 無 Record 訊息時 fallback 用 Session 欄位
 
 **Running dynamics FIT field numbers（Record 訊息）：**
 | Field # | 名稱 | Scale | 單位 |
@@ -133,6 +139,29 @@ function weekLoad(data, isoWeek) {
 | 83 | vertical_ratio | ÷100 | % |
 | 73 / 6 | enhanced_speed / speed | ÷1000 | m/s |
 | 53 | fractional_cadence | ÷128 | foot rpm |
+
+### 主段切割（segmentation helpers）
+
+`autoRunType(date, 'running')` → `'easy'` / `'lsd'` / `'intervals'`，由此決定切割方式：
+
+| type | 做法 | 輸出 |
+|------|------|------|
+| `easy` / `lsd` | cadence 裁頭尾（`trimContinuous`）→ mainRecs | `splits` 每公里分段 |
+| `intervals` | Lap boundary（`classifyLaps`）→ work 圈 records | `reps` + `workAvgPace/HR` |
+
+**helpers：**
+- `decodeRecs(rawRecs)` — 原始 field map → `{t, ts, dt, spd, spm, hr, vo, gct, vr}` 陣列，`t` = elapsed seconds
+- `smoothSPM(recs)` — 10s centred rolling mean，與 recs 等長
+- `trimContinuous(recs, smooth)` — 找頭尾第一/最後一個 spm≥140 且持續≥30s 的區間 → `[si, ei]`
+- `classifyLaps(rawLaps, recs, firstRecTs)` — 解碼 Lap + 依 spm 分類 work/warmup/cooldown/recovery；移除 session-summary lap（elapsed ≥ 80% 總計）
+- `buildRepData(labeledLaps)` — work/recovery 交叉輸出
+- `buildKmSplits(recs)` — tagCumDist → 每 1000m 一個 bucket
+- `buildRunWalkSplits(recs, smooth)` — run/walk 各自統計（保留備用，autoRunType 目前不回傳 run_walk）
+
+**Tier 2（時序）：**
+- `downsample(mainRecs, 5)` → `{interval_s:5, points:[{t, hr, spm, pace_s_km, gct_ms, vert_osc_cm, vert_ratio_pct}]}`
+- 附在 return 物件的 `_tier2` 欄位（底線前綴 = 暫存，不寫進 2026.json）
+- `confirmImport` 在寫 Drive 前先把 `_tier2` 存到 `timeseries/<date>_run_<time>.json`，再 `delete a._tier2`
 
 **批次匯入：**
 - `handleImportFiles(event)` — 支援多檔同時選取（.zip / .fit / .csv / .tcx）
@@ -160,7 +189,7 @@ fmtSession(s)  // → "6.8km，配速 7:21，HR 138bpm，GCT 262ms，…"
 Gemini key 存在 `lifeLog/config.json`（`sharedStore` 讀取，各模組共用）。
 
 ### 整體課表分析（`buildCoachingPrompt` → `runAICoach`）
-- 輸入：目標賽事 + ACWR + 已完成週摘要 + `recentSessions` 跑步數據 + 未來 3 週課表
+- 輸入：目標賽事 + ACWR + 已完成週摘要 + 近12週 rollup（`buildRollup`）+ PBs + `recentSessions` 跑步數據 + 未來 3 週課表
 - 模型：Gemini 2.0 Flash，maxOutputTokens: 1200
 - 輸出：繁體中文，三段條列（訓練狀況評估 / 課表建議 / 賽前注意事項）
 
@@ -169,12 +198,21 @@ Gemini key 存在 `lifeLog/config.json`（`sharedStore` 讀取，各模組共用
 - 輸入：本次訓練完整 metrics（含 running dynamics）+ `recentSessions` 同類型比較 + 未來課表
 - 使用 `fmtSession()` 統一格式化
 
-## 資料架構參考
+## 資料架構
 
 本模組遵循 workout-data-architecture skill 的三層設計：
-- **Tier 1**：`2026.json`（現行格式，date-keyed session array 即 Tier 1 等價）
-- **Tier 2**：逐次訓練時序（尚未實作，未來存 `timeseries/<date>_run.json`）
-- **Tier 3**：週 / 月 rollup（尚未實作）
+- **Tier 1**：`2026.json`（date-keyed，永久保留，session summary + segmentation metrics）
+- **Tier 2**：`timeseries/<date>_run_<time>.json`（5s 格點，`confirmImport` 寫入；不存進 2026.json）
+- **Tier 3**：`buildRollup(data)` on-the-fly，不寫 Drive，供 AI prompt 使用
+
+### `buildRollup(data)` 輸出結構
+```js
+{
+  weekly: [{ week: '2026-W29', totalLoad, runKm, sessions, avgHR? }, ...], // 近12週
+  monthly:[{ month: '2026-07', totalLoad, runKm, sessions }, ...],        // 近6個月
+  pbs: { longestRun?, fastestPace5k?, fastestPace10k? }
+}
+```
 
 ## 視圖
 

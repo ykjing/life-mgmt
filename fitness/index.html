@@ -1121,7 +1121,7 @@ const EX_THU = [
 
 // ── State ────────────────────────────────────────────────────────────────────
 let data = {};
-let store = null, sharedStore = null;
+let store = null, sharedStore = null, timeseriesStore = null;
 let geminiKey = null, isDemoMode = false;
 let calY = new Date().getFullYear(), calM = new Date().getMonth();
 let pDate = null, pRpe = 0, pType = 'easy', pStat = 'done';
@@ -1141,8 +1141,9 @@ async function init() {
 
 async function activateStore() {
   const onAuthFail = () => document.getElementById('auth-ov').classList.remove('gone');
-  sharedStore = createDriveStore('lifeLog', onAuthFail);
-  store       = createDriveStore('lifeLog/fitness', onAuthFail);
+  sharedStore      = createDriveStore('lifeLog',                    onAuthFail);
+  store            = createDriveStore('lifeLog/fitness',            onAuthFail);
+  timeseriesStore  = createDriveStore('lifeLog/fitness/timeseries', onAuthFail);
   const y = new Date().getFullYear();
   const raw = await store.readJson(`${y}.json`);
   if (raw) data = raw;
@@ -1799,7 +1800,226 @@ async function decompressZipEntry(entry) {
   return null;
 }
 
-// ── FIT binary parser (Session + Record messages) ─────────────────────────────
+// ── FIT segmentation helpers ──────────────────────────────────────────────────
+
+function meanOf(arr, field) {
+  const vals = arr.map(r => r[field]).filter(v => v != null);
+  return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+}
+
+function secsToPace(spk) {
+  const m = Math.floor(spk / 60), s = Math.round(spk % 60);
+  return `${m}:${p2(s)}`;
+}
+
+// Decode raw FIT Record (gid 20) field maps → clean objects with elapsed time
+// Field refs: 253=timestamp, 73/6=enhanced/speed(÷1000=m/s), 3=hr, 4=cadence, 53=frac_cad(÷128),
+//             39=vert_osc(÷10=mm), 41=gct(÷10=ms), 83=vert_ratio(÷100=%)
+function decodeRecs(rawRecs) {
+  let startTs = null, lastTs = null;
+  const recs = rawRecs.map(m => {
+    const ts = m[253];
+    if (startTs === null && ts != null) startTs = ts;
+    const dt     = (ts != null && lastTs != null) ? Math.max(0, ts - lastTs) : 1;
+    if (ts != null) lastTs = ts;
+    const spdRaw = m[73] ?? m[6];
+    const spd    = spdRaw != null ? spdRaw / 1000 : null;
+    const cadRaw = m[4]; const frac = m[53];
+    const spm    = cadRaw != null ? (cadRaw + (frac != null ? frac / 128 : 0)) * 2 : null;
+    return {
+      t:   ts != null && startTs != null ? ts - startTs : null,
+      ts, dt, spd, spm,
+      hr:  m[3]  ?? null,
+      vo:  m[39] != null ? m[39] / 10  : null,  // mm
+      gct: m[41] != null ? m[41] / 10  : null,  // ms
+      vr:  m[83] != null ? m[83] / 100 : null,  // %
+    };
+  });
+  return { recs, startTs };
+}
+
+// 10-second centred rolling SPM smooth → array parallel to recs
+function smoothSPM(recs, halfWin = 5) {
+  return recs.map((r, i) => {
+    const tI = r.t ?? 0;
+    let sum = 0, cnt = 0;
+    for (let j = i; j >= 0 && tI - (recs[j].t ?? tI) <= halfWin; j--)
+      if (recs[j].spm != null) { sum += recs[j].spm; cnt++; }
+    for (let j = i + 1; j < recs.length && (recs[j].t ?? tI) - tI <= halfWin; j++)
+      if (recs[j].spm != null) { sum += recs[j].spm; cnt++; }
+    return cnt > 0 ? sum / cnt : 0;
+  });
+}
+
+// Cadence-based head/tail trim → returns [startIdx, endIdx]
+function trimContinuous(recs, smooth) {
+  const WALK_SPM = 140, MIN_TRIM_S = 30;
+  let si = 0, ei = recs.length - 1;
+  for (let i = 0; i < recs.length; i++) {
+    if (smooth[i] >= WALK_SPM) {
+      let j = i + 1;
+      while (j < recs.length && smooth[j] >= WALK_SPM) j++;
+      if ((recs[j - 1].t ?? 0) - (recs[i].t ?? 0) >= MIN_TRIM_S) { si = i; break; }
+    }
+  }
+  for (let i = recs.length - 1; i >= 0; i--) {
+    if (smooth[i] >= WALK_SPM) {
+      let j = i - 1;
+      while (j >= 0 && smooth[j] >= WALK_SPM) j--;
+      if ((recs[i].t ?? 0) - (recs[j + 1].t ?? 0) >= MIN_TRIM_S) { ei = i; break; }
+    }
+  }
+  return [si, ei];
+}
+
+// Decode + classify Lap (gid 19) messages as work/warmup/cooldown/recovery
+function classifyLaps(rawLaps, recs, firstRecTs) {
+  if (!rawLaps.length || firstRecTs == null) return [];
+  const WORK_SPM = 150;
+  const decoded = rawLaps.map(m => {
+    const lapTs   = m[2];
+    const elapsed = m[7] != null ? m[7] / 1000 : null;
+    if (lapTs == null || elapsed == null || elapsed < 10) return null;
+    const startT  = lapTs - firstRecTs;
+    const endT    = startT + elapsed;
+    const lapRecs = recs.filter(r => r.t != null && r.t >= startT && r.t <= endT);
+    const avgSPM  = meanOf(lapRecs, 'spm') ?? (m[18] != null ? m[18] * 2 : 0);
+    return { startT, endT, elapsed, avgHR: m[16] ?? null, avgSPM, lapRecs };
+  }).filter(Boolean);
+  if (!decoded.length) return [];
+  // Remove session-summary lap (one whose elapsed ≈ sum of all others)
+  const totalElapsed = decoded.reduce((s, l) => s + l.elapsed, 0);
+  const laps = decoded.length > 1 ? decoded.filter(l => l.elapsed < totalElapsed * 0.8) : decoded;
+  const useLaps = laps.length >= 2 ? laps : decoded;
+  const n = useLaps.length;
+  return useLaps.map((lap, i) => ({
+    ...lap,
+    kind: lap.avgSPM >= WORK_SPM ? 'work'
+        : i === 0               ? 'warmup'
+        : i === n - 1           ? 'cooldown'
+        : 'recovery',
+  }));
+}
+
+// Build per-rep + recovery array for interval sessions
+function buildRepData(labeledLaps) {
+  const result = [];
+  let repNum = 0;
+  for (const lap of labeledLaps) {
+    if (lap.kind === 'warmup' || lap.kind === 'cooldown') continue;
+    const moving = (lap.lapRecs || []).filter(r => r.spd > 0.5);
+    if (lap.kind === 'work') {
+      repNum++;
+      const distM  = moving.reduce((s, r) => s + (r.spd ?? 0) * r.dt, 0);
+      const avgSpd = meanOf(moving, 'spd');
+      const avgHR  = meanOf(moving, 'hr');
+      const peakHR = moving.reduce((mx, r) => r.hr != null ? Math.max(mx, r.hr) : mx, 0) || null;
+      const avgGCT = meanOf(moving, 'gct');
+      result.push({
+        kind: 'work', rep: repNum,
+        distM:  Math.round(distM),
+        pace:   avgSpd > 0 ? secsToPace(1000 / avgSpd) : null,
+        avgHR:  avgHR  != null ? Math.round(avgHR)  : null,
+        peakHR: peakHR || null,
+        gctMs:  avgGCT != null ? Math.round(avgGCT) : null,
+      });
+    } else {
+      const all     = lap.lapRecs || [];
+      const firstHR = all.find(r => r.hr != null)?.hr ?? null;
+      const lastHR  = [...all].reverse().find(r => r.hr != null)?.hr ?? null;
+      result.push({
+        kind: 'recovery',
+        durationS: Math.round(lap.elapsed),
+        startHR: firstHR,
+        endHR:   lastHR,
+        dropHR:  firstHR != null && lastHR != null ? firstHR - lastHR : null,
+      });
+    }
+  }
+  return result;
+}
+
+// Tag each record with cumulative distance from start of mainRecs
+function tagCumDist(recs) {
+  let cum = 0;
+  return recs.map(r => {
+    if (r.spd != null && r.spd > 0.5) cum += r.spd * r.dt;
+    return { ...r, cum };
+  });
+}
+
+// Per-km splits for continuous runs (easy/lsd)
+function buildKmSplits(recs) {
+  const tagged = tagCumDist(recs);
+  const totalM = tagged[tagged.length - 1]?.cum ?? 0;
+  if (totalM < 100) return [];
+  const nKm = Math.ceil(totalM / 1000);
+  const splits = [];
+  for (let k = 1; k <= nKm; k++) {
+    const bkt    = tagged.filter(r => r.cum > (k - 1) * 1000 && r.cum <= k * 1000 && r.spd > 0.5);
+    if (!bkt.length) continue;
+    const avgSpd = meanOf(bkt, 'spd'), avgHR = meanOf(bkt, 'hr'), avgSPM = meanOf(bkt, 'spm');
+    splits.push({
+      km: k === nKm ? Math.round(totalM / 10) / 100 : k,
+      pace:    avgSpd > 0 ? secsToPace(1000 / avgSpd) : null,
+      avgHR:   avgHR  != null ? Math.round(avgHR)  : null,
+      spm:     avgSPM != null ? Math.round(avgSPM) : null,
+      strideM: avgSpd > 0 && avgSPM > 0 ? Math.round(avgSpd / (avgSPM / 60) * 100) / 100 : null,
+    });
+  }
+  return splits;
+}
+
+// Per-km splits with run/walk segments separated (for run_walk type)
+function buildRunWalkSplits(recs, smooth) {
+  const WALK_SPM = 140;
+  const tagged = tagCumDist(recs).map((r, i) => ({ ...r, isRun: smooth[i] >= WALK_SPM }));
+  const totalM = tagged[tagged.length - 1]?.cum ?? 0;
+  if (totalM < 100) return [];
+  const nKm = Math.ceil(totalM / 1000);
+  const splits = [];
+  for (let k = 1; k <= nKm; k++) {
+    const bkt  = tagged.filter(r => r.cum > (k - 1) * 1000 && r.cum <= k * 1000 && r.spd > 0.5);
+    if (!bkt.length) continue;
+    const runB = bkt.filter(r =>  r.isRun);
+    const wlkB = bkt.filter(r => !r.isRun);
+    const runD = runB.reduce((s, r) => s + r.spd * r.dt, 0);
+    const wlkD = wlkB.reduce((s, r) => s + r.spd * r.dt, 0);
+    const runSpd = meanOf(runB, 'spd');
+    splits.push({
+      km:        k === nKm ? Math.round(totalM / 10) / 100 : k,
+      runPace:   runSpd > 0 ? secsToPace(1000 / runSpd) : null,
+      runAvgHR:  meanOf(runB, 'hr')  != null ? Math.round(meanOf(runB,  'hr'))  : null,
+      runSpm:    meanOf(runB, 'spm') != null ? Math.round(meanOf(runB,  'spm')) : null,
+      walkAvgHR: meanOf(wlkB, 'hr') != null  ? Math.round(meanOf(wlkB, 'hr'))  : null,
+      walkPct:   runD + wlkD > 0 ? Math.round(wlkD / (runD + wlkD) * 100) : 0,
+    });
+  }
+  return splits;
+}
+
+// Downsample mainRecs to 5s grid for Tier 2 storage
+function downsample(recs, intervalSec = 5) {
+  if (!recs.length) return { interval_s: intervalSec, points: [] };
+  const tMax = recs[recs.length - 1].t ?? 0;
+  const points = [];
+  for (let t = 0; t <= tMax; t += intervalSec) {
+    const bkt    = recs.filter(r => r.t != null && r.t >= t && r.t < t + intervalSec);
+    if (!bkt.length) continue;
+    const avgSpd = meanOf(bkt, 'spd');
+    const pt     = { t };
+    const hr  = meanOf(bkt, 'hr');  if (hr  != null) pt.hr             = Math.round(hr);
+    const spm = meanOf(bkt, 'spm'); if (spm != null) pt.spm            = Math.round(spm);
+    if (avgSpd != null && avgSpd > 0)                pt.pace_s_km      = Math.round(1000 / avgSpd);
+    const gct = meanOf(bkt, 'gct'); if (gct != null) pt.gct_ms         = Math.round(gct);
+    const vo  = meanOf(bkt, 'vo');  if (vo  != null) pt.vert_osc_cm    = Math.round(vo / 10 * 10) / 10;
+    const vr  = meanOf(bkt, 'vr');  if (vr  != null) pt.vert_ratio_pct = Math.round(vr * 10) / 10;
+    points.push(pt);
+  }
+  return { interval_s: intervalSec, points };
+}
+
+// ── FIT binary parser (Session + Lap + Record messages) ───────────────────────
 function parseGarminFIT(buffer) {
   const view = new DataView(buffer);
   if (buffer.byteLength < 14) return [];
@@ -1812,14 +2032,15 @@ function parseGarminFIT(buffer) {
 
   function rd(off, sz, le) {
     if (off + sz > buffer.byteLength) return null;
-    if (sz === 1) { const v = view.getUint8(off);                              return v === 0xFF         ? null : v; }
+    if (sz === 1) { const v = view.getUint8(off);                                return v === 0xFF         ? null : v; }
     if (sz === 2) { const v = le ? view.getUint16(off, true) : view.getUint16(off); return v === 0xFFFF     ? null : v; }
     if (sz === 4) { const v = le ? view.getUint32(off, true) : view.getUint32(off); return v === 0xFFFFFFFF ? null : v; }
     return null;
   }
 
   const defs = {};
-  const recs = []; // Record messages (gid 20)
+  const rawRecs = []; // Record messages (gid 20)
+  const rawLaps = []; // Lap messages (gid 19)
   let session = null;
   let offset = hdrSize;
 
@@ -1833,11 +2054,12 @@ function parseGarminFIT(buffer) {
     const hdr = view.getUint8(offset++);
 
     if (hdr & 0x80) {
-      // Compressed timestamp data message — process normally, timestamp is in header bits
+      // Compressed timestamp record
       const lmt = (hdr >> 5) & 0x03;
       const def = defs[lmt]; if (!def) break;
       const m = extractFields(def, offset);
-      if (def.gid === 20) recs.push(m);
+      if      (def.gid === 20) rawRecs.push(m);
+      else if (def.gid === 19) rawLaps.push(m);
       else if (def.gid === 18 && !session) session = m;
       offset += def.totalSize;
       continue;
@@ -1865,7 +2087,8 @@ function parseGarminFIT(buffer) {
     } else {
       const def = defs[lmt]; if (!def) { offset++; continue; }
       const m = extractFields(def, offset);
-      if (def.gid === 20) recs.push(m);
+      if      (def.gid === 20) rawRecs.push(m);
+      else if (def.gid === 19) rawLaps.push(m);
       else if (def.gid === 18 && !session) session = m;
       offset += def.totalSize;
     }
@@ -1875,58 +2098,76 @@ function parseGarminFIT(buffer) {
   const sport = session[5];
   if (sport != null && sport !== 1) return [];                               // 1 = running; null = unknown, accept
 
-  // ── Derive metrics from Record messages (gid 20) ────────────────────────────
-  // Field refs: 253=timestamp, 73/6=enhanced/speed(m/s×1000), 3=hr, 4=cadence(foot rpm),
-  //   53=frac_cad(×128), 39=vert_osc(mm×10), 41=gct(ms×10), 83=vert_ratio(%×100)
-  let lastTs = null, distInt = 0;
-  let hrSum = 0, hrN = 0, spmSum = 0, spmN = 0, spdSum = 0, spdN = 0;
-  let voSum = 0, voN = 0, gctSum = 0, gctN = 0, vrSum = 0, vrN = 0;
+  // ── Decode Record messages → elapsed-time objects ────────────────────────────
+  const { recs, startTs } = decodeRecs(rawRecs);
+  const sesTsRaw = session[2] ?? session[253];
+  const ds = sesTsRaw ? new Date((sesTsRaw + FIT_EPOCH) * 1000).toISOString().slice(0, 10) : null;
+  if (!ds) return [];
 
-  for (const m of recs) {
-    const ts     = m[253];
-    const spdRaw = m[73] ?? m[6];                                            // enhanced_speed preferred
-    const spd    = spdRaw != null ? spdRaw / 1000 : null;                   // m/s
-    const cadRaw = m[4]; const frac = m[53];
-    const spm    = cadRaw != null ? (cadRaw + (frac != null ? frac / 128 : 0)) * 2 : null;
-    const hr     = m[3];
-    const vo     = m[39] != null ? m[39] / 10  : null;                      // mm
-    const gct    = m[41] != null ? m[41] / 10  : null;                      // ms
-    const vr     = m[83] != null ? m[83] / 100 : null;                      // %
+  const durSec = session[7] ? session[7] / 1000 : 0;
 
-    const dt = (ts != null && lastTs != null) ? Math.max(0, ts - lastTs) : 1;
-    if (ts != null) lastTs = ts;
+  // ── Segmentation by run type ─────────────────────────────────────────────────
+  const runType    = autoRunType(ds, 'running');
+  const isInterval = runType === 'intervals';
+  const smooth     = smoothSPM(recs);
 
-    if (spd != null && spd > 0.5) {                                         // moving only (>1.8 km/h)
-      distInt += spd * dt;
-      spdSum += spd; spdN++;
-      if (hr  != null) { hrSum  += hr;  hrN++;  }
-      if (spm != null) { spmSum += spm; spmN++; }
-      if (vo  != null) { voSum  += vo;  voN++;  }
-      if (gct != null) { gctSum += gct; gctN++; }
-      if (vr  != null) { vrSum  += vr;  vrN++;  }
+  let mainRecs, mainSmooth, splits = [], reps = [], workStats = {};
+
+  if (isInterval) {
+    const labeled = classifyLaps(rawLaps, recs, startTs);
+    const workLaps = labeled.filter(l => l.kind === 'work');
+    if (workLaps.length >= 2) {
+      mainRecs   = workLaps.flatMap(l => l.lapRecs || []);
+      reps       = buildRepData(labeled);
+      const wMov = mainRecs.filter(r => r.spd > 0.5);
+      const wSpd = meanOf(wMov, 'spd');
+      const wHR  = meanOf(wMov, 'hr');
+      workStats  = {
+        repCount: reps.filter(r => r.kind === 'work').length,
+        ...(wSpd > 0   && { workAvgPace: secsToPace(1000 / wSpd) }),
+        ...(wHR != null && { workAvgHR:  Math.round(wHR) }),
+      };
+    } else {
+      const [si, ei] = trimContinuous(recs, smooth);
+      mainRecs = recs.slice(si, ei + 1);
+    }
+    mainSmooth = smooth;
+  } else {
+    const [si, ei] = trimContinuous(recs, smooth);
+    mainRecs   = recs.slice(si, ei + 1);
+    mainSmooth = smooth.slice(si, ei + 1);
+    splits     = buildKmSplits(mainRecs);
+  }
+
+  // ── Compute averages from mainRecs (moving samples only) ─────────────────────
+  let distInt = 0;
+  let spdSum = 0, spdN = 0, hrSum = 0, hrN = 0, spmSum = 0, spmN = 0;
+  let voSum  = 0, voN  = 0, gctSum = 0, gctN = 0, vrSum  = 0, vrN  = 0;
+
+  for (const r of mainRecs) {
+    if (r.spd != null && r.spd > 0.5) {
+      distInt += r.spd * r.dt;
+      spdSum += r.spd; spdN++;
+      if (r.hr  != null) { hrSum  += r.hr;  hrN++;  }
+      if (r.spm != null) { spmSum += r.spm; spmN++; }
+      if (r.vo  != null) { voSum  += r.vo;  voN++;  }
+      if (r.gct != null) { gctSum += r.gct; gctN++; }
+      if (r.vr  != null) { vrSum  += r.vr;  vrN++;  }
     }
   }
 
   // ── Build session summary ────────────────────────────────────────────────────
-  const sesTsRaw = session[2] ?? session[253];                              // start_time preferred
-  const elapsed  = session[7];                                              // scale 1000 → s
-  const sesDistR = session[9];                                              // scale 100 → m
+  const sesDistR = session[9];
+  const distM    = distInt > 10 ? distInt : (sesDistR ? sesDistR / 100 : 0);
+  const distKm   = Math.round(distM) / 1000;
 
-  const ds = sesTsRaw ? new Date((sesTsRaw + FIT_EPOCH) * 1000).toISOString().slice(0, 10) : null;
-  if (!ds) return [];
-
-  const durSec  = elapsed ? elapsed / 1000 : 0;
-  const distM   = distInt > 10 ? distInt : (sesDistR ? sesDistR / 100 : 0); // prefer integration
-  const distKm  = Math.round(distM) / 1000;
-
-  const avgSpd  = spdN > 0 ? spdSum  / spdN  : 0;
-  const avgSPM  = spmN > 0 ? spmSum  / spmN  : (session[18] ? session[18] * 2 : 0);
-  const avgHR   = hrN  > 0 ? Math.round(hrSum / hrN) : (session[16] || 0);
+  const avgSpd  = spdN > 0 ? spdSum / spdN : 0;
+  const avgSPM  = spmN > 0 ? spmSum / spmN : (session[18] ? session[18] * 2 : 0);
+  const avgHR   = hrN  > 0 ? Math.round(hrSum  / hrN)             : (session[16] || 0);
   const avgVO   = voN  > 0 ? Math.round(voSum  / voN  / 10 * 10) / 10 : null; // mm→cm, 1dp
-  const avgGCT  = gctN > 0 ? Math.round(gctSum / gctN)              : null;  // ms
-  const avgVR   = vrN  > 0 ? Math.round(vrSum  / vrN  * 10)  / 10   : null;  // %, 1dp
-  // Stride from speed/cadence (m/s ÷ strides/s = m/stride) → cm to match CSV/manual format
-  const avgStr  = (avgSPM > 0 && avgSpd > 0) ? Math.round(avgSpd / (avgSPM / 60) * 100) : null; // cm
+  const avgGCT  = gctN > 0 ? Math.round(gctSum / gctN)                : null;
+  const avgVR   = vrN  > 0 ? Math.round(vrSum  / vrN  * 10) / 10      : null;
+  const avgStr  = avgSPM > 0 && avgSpd > 0 ? Math.round(avgSpd / (avgSPM / 60) * 100) : null; // cm
 
   let avgPace = '';
   if (distKm > 0.01 && durSec > 0) {
@@ -1935,13 +2176,18 @@ function parseGarminFIT(buffer) {
   }
 
   return [{
-    date: ds, type: autoRunType(ds, 'running'),
+    date: ds, type: runType,
     duration: Math.round(durSec / 60), distance: Math.round(distKm * 100) / 100,
     avgPace, avgHR, avgCadence: Math.round(avgSPM),
     ...(avgStr != null && { avgStrideLength: avgStr }),
     ...(avgVO  != null && { avgVerticalOscillation: avgVO }),
     ...(avgGCT != null && { avgGroundContactTime: avgGCT }),
     ...(avgVR  != null && { avgVerticalRatio: avgVR }),
+    segmentType: isInterval ? 'interval' : 'continuous',
+    ...(splits.length && { splits }),
+    ...(reps.length   && { reps }),
+    ...workStats,
+    _tier2: downsample(mainRecs, 5),
   }];
 }
 
@@ -2033,7 +2279,14 @@ function showImportPreview(activities) {
 async function confirmImport() {
   const checked = [...document.querySelectorAll('.imp-chk:checked')].map(c=>importQueue[+c.dataset.i]);
   if (!checked.length) return;
-  checked.forEach(a => {
+  for (const a of checked) {
+    // Save Tier 2 time-series to Drive (skip in demo mode)
+    if (!isDemoMode && a._tier2 && timeseriesStore) {
+      const fname = `${a.date}_run_${(a.time || '0000').replace(':', '')}.json`;
+      await timeseriesStore.writeJson(fname, a._tier2, () => {});
+    }
+    delete a._tier2;
+
     const existing = (data[a.date]||[])[0];
     data[a.date] = [{
       id: existing?.id || (Date.now().toString(36)+Math.random().toString(36).slice(2,5)),
@@ -2050,10 +2303,16 @@ async function confirmImport() {
         ...(a.avgVerticalOscillation   && {avgVerticalOscillation: a.avgVerticalOscillation}),
         ...(a.avgGroundContactTime     && {avgGroundContactTime: a.avgGroundContactTime}),
         ...(a.avgVerticalRatio         && {avgVerticalRatio: a.avgVerticalRatio}),
+        ...(a.segmentType              && {segmentType: a.segmentType}),
+        ...(a.splits?.length           && {splits: a.splits}),
+        ...(a.reps?.length             && {reps: a.reps}),
+        ...(a.repCount                 && {repCount: a.repCount}),
+        ...(a.workAvgPace              && {workAvgPace: a.workAvgPace}),
+        ...(a.workAvgHR                && {workAvgHR: a.workAvgHR}),
         ...(existing?.metrics?.strengthDone && {strengthDone: existing.metrics.strengthDone}),
       },
     }];
-  });
+  }
   const years = [...new Set(checked.map(a=>+a.date.slice(0,4)))];
   for (const y of years) await saveYear(y);
   closeImport();
@@ -2275,6 +2534,65 @@ function recentSessions(sessions) {
   return by3mo.length >= by20.length ? by3mo : by20;
 }
 
+// ── Tier 3 rollup (on-the-fly, no Drive write) ────────────────────────────────
+function buildRollup(sourceData) {
+  const sessions = buildSessionArray(sourceData);
+  const RUN_TYPES = new Set(['easy', 'lsd', 'intervals', 'cardio', 'sport']);
+
+  function isoWeekKey(dateStr) {
+    const d = new Date(dateStr + 'T12:00:00');
+    const dow = d.getDay() || 7;
+    d.setDate(d.getDate() + 4 - dow);
+    const jan4 = new Date(d.getFullYear(), 0, 4);
+    const week = Math.ceil(((d - jan4) / 86400000 + jan4.getDay() + 6) / 7);
+    return `${d.getFullYear()}-W${String(week).padStart(2, '0')}`;
+  }
+
+  const wMap = {};
+  for (const s of sessions) {
+    const wk = isoWeekKey(s.date);
+    if (!wMap[wk]) wMap[wk] = { load: 0, runKm: 0, sessions: 0, hrSum: 0, hrN: 0 };
+    const w = wMap[wk];
+    w.load += s.load || 0;
+    w.sessions++;
+    if (RUN_TYPES.has(s.type) && s.distance) w.runKm += s.distance;
+    if (s.avgHR) { w.hrSum += s.avgHR; w.hrN++; }
+  }
+  const weekly = Object.entries(wMap)
+    .sort((a, b) => a[0].localeCompare(b[0])).slice(-12)
+    .map(([week, w]) => ({
+      week, totalLoad: w.load,
+      runKm: Math.round(w.runKm * 10) / 10,
+      sessions: w.sessions,
+      ...(w.hrN > 0 && { avgHR: Math.round(w.hrSum / w.hrN) }),
+    }));
+
+  const mMap = {};
+  for (const s of sessions) {
+    const mo = s.date.slice(0, 7);
+    if (!mMap[mo]) mMap[mo] = { load: 0, runKm: 0, sessions: 0 };
+    mMap[mo].load += s.load || 0;
+    mMap[mo].sessions++;
+    if (RUN_TYPES.has(s.type) && s.distance) mMap[mo].runKm += s.distance;
+  }
+  const monthly = Object.entries(mMap)
+    .sort((a, b) => a[0].localeCompare(b[0])).slice(-6)
+    .map(([month, m]) => ({ month, totalLoad: m.load, runKm: Math.round(m.runKm * 10) / 10, sessions: m.sessions }));
+
+  function paceS(p) { if (!p) return Infinity; const [m, s] = p.split(':').map(Number); return m * 60 + (s || 0); }
+  const runs    = sessions.filter(s => RUN_TYPES.has(s.type));
+  const longest = runs.reduce((b, s) => (s.distance || 0) > (b?.distance || 0) ? s : b, null);
+  const fast5k  = runs.filter(s => s.distance >= 5  && s.avgPace).reduce((b, s) => paceS(s.avgPace) < paceS(b?.avgPace) ? s : b, null);
+  const fast10k = runs.filter(s => s.distance >= 10 && s.avgPace).reduce((b, s) => paceS(s.avgPace) < paceS(b?.avgPace) ? s : b, null);
+  const pbs = {
+    ...(longest  && { longestRun:     { date: longest.date,  km:   longest.distance } }),
+    ...(fast5k   && { fastestPace5k:  { date: fast5k.date,   pace: fast5k.avgPace   } }),
+    ...(fast10k  && { fastestPace10k: { date: fast10k.date,  pace: fast10k.avgPace  } }),
+  };
+
+  return { weekly, monthly, pbs };
+}
+
 function buildCoachingPrompt() {
   if (!PLAN) return '（備賽計畫尚未載入，無法生成分析）';
   const today = todayStr();
@@ -2311,6 +2629,19 @@ function buildCoachingPrompt() {
     ? recentRuns.map(r => `- ${r.date} ${r.type}：${fmtSession(r)}`).join('\n')
     : '（尚無跑步資料）';
 
+  // 12-week rollup
+  const rollup = buildRollup(data);
+  const rollupLines = rollup.weekly.length
+    ? rollup.weekly.map(w =>
+        `- ${w.week}：跑量 ${w.runKm}km 總負荷 ${w.totalLoad}${w.avgHR ? ` 均心率 ${w.avgHR}bpm` : ''} (${w.sessions}次訓練)`
+      ).join('\n')
+    : '（尚無資料）';
+  const pbLines = [
+    rollup.pbs.longestRun     && `最長跑：${rollup.pbs.longestRun.km}km（${rollup.pbs.longestRun.date}）`,
+    rollup.pbs.fastestPace5k  && `5k最快配速：${rollup.pbs.fastestPace5k.pace}/km（${rollup.pbs.fastestPace5k.date}）`,
+    rollup.pbs.fastestPace10k && `10k最快配速：${rollup.pbs.fastestPace10k.pace}/km（${rollup.pbs.fastestPace10k.date}）`,
+  ].filter(Boolean).join('\n') || '（尚無資料）';
+
   // Upcoming 3 weeks plan
   const upcoming = PLAN.weeks.filter(w => addD(w.start, 6) >= today).slice(0, 3);
   const upcomingLines = upcoming.map(w => {
@@ -2333,6 +2664,12 @@ function buildCoachingPrompt() {
 
 ## 已完成訓練週摘要
 ${weekLines || '（無資料）'}
+
+## 近12週跑量統計
+${rollupLines}
+
+## 個人最佳紀錄
+${pbLines}
 
 ## 近期跑步數據（最近 20 次或 3 個月，共 ${recentRuns.length} 次）
 ${runLines}
