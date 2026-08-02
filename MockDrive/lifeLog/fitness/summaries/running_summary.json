@@ -1,0 +1,62 @@
+[
+  {
+    "id": "a1",
+    "date": "2026-06-15",
+    "type": "badminton",
+    "duration": 90,
+    "distance": 0,
+    "avgPace": "",
+    "avgHR": 0,
+    "avgCadence": 0,
+    "calories": 0,
+    "elevationGain": 0,
+    "rpe": 6,
+    "load": 540,
+    "status": "done",
+    "note": "",
+    "source": "manual",
+    "metrics": {}
+  },
+  {
+    "id": "a2",
+    "date": "2026-06-17",
+    "type": "intervals",
+    "duration": 45,
+    "distance": 5.01,
+    "avgPace": "5:58",
+    "avgHR": 152,
+    "avgCadence": 146,
+    "calories": 0,
+    "elevationGain": 0,
+    "rpe": 8,
+    "load": 360,
+    "status": "done",
+    "note": "4趟1km 5:49/6:03/6:00/5:50",
+    "source": "garmin_fit",
+    "metrics": {
+      "avgStrideLength": 93,
+      "avgVerticalOscillation": 8.2,
+      "avgGroundContactTime": 264
+    }
+  },
+  {
+    "id": "a3",
+    "date": "2026-06-18",
+    "type": "strength",
+    "duration": 25,
+    "distance": 0,
+    "avgPace": "",
+    "avgHR": 0,
+    "avgCadence": 0,
+    "calories": 0,
+    "elevationGain": 0,
+    "rpe": 6,
+    "load": 150,
+    "status": "done",
+    "note": "",
+    "source": "manual",
+    "metrics": {
+      "strengthDone": ["row", "press", "shoulder", "plank"]
+    }
+  }
+]

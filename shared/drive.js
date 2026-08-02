@@ -38,23 +38,40 @@ async function drivePatch(fileId, fileContent) {
   if (!resp.ok) throw new Error(`Drive PATCH ${resp.status}`);
 }
 
+// Resolve a slash-separated folder path, creating folders as needed.
+// Returns the Drive folder ID of the deepest folder.
+async function resolveFolderPath(folderPath) {
+  const parts = folderPath.split('/').filter(Boolean);
+  let parentId = null;
+  for (const part of parts) {
+    const parentClause = parentId ? `'${parentId}' in parents` : `'root' in parents`;
+    const q = `name='${part}' and mimeType='application/vnd.google-apps.folder' and ${parentClause} and trashed=false`;
+    const res = await driveGet(`files?q=${encodeURIComponent(q)}&fields=files(id)&spaces=drive`);
+    if (res.files.length > 0) {
+      parentId = res.files[0].id;
+    } else {
+      const meta = { name: part, mimeType: 'application/vnd.google-apps.folder' };
+      if (parentId) meta.parents = [parentId];
+      const created = await drivePost('files', meta);
+      parentId = created.id;
+    }
+  }
+  return parentId;
+}
+
 /**
- * createDriveStore(folderName, onAuthFailure)
- * Returns { readJson, writeJson, clearCache } scoped to a single Drive folder.
- * Each module creates its own store with its own folder name and cache.
+ * createDriveStore(folderPath, onAuthFailure)
+ * folderPath supports nested paths: 'lifeLog' or 'lifeLog/fitness'
+ * Returns { readJson, writeJson, clearCache }
  */
-export function createDriveStore(folderName, onAuthFailure) {
+export function createDriveStore(folderPath, onAuthFailure) {
   let folderId = null;
   const fileIdCache = {};
   const dataCache   = {};
 
   async function getOrCreateFolder() {
     if (folderId) return folderId;
-    const q   = `name='${folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
-    const res = await driveGet(`files?q=${encodeURIComponent(q)}&fields=files(id)&spaces=drive`);
-    folderId  = res.files.length > 0
-      ? res.files[0].id
-      : (await drivePost('files', { name: folderName, mimeType: 'application/vnd.google-apps.folder' })).id;
+    folderId = await resolveFolderPath(folderPath);
     return folderId;
   }
 
@@ -69,18 +86,18 @@ export function createDriveStore(folderName, onAuthFailure) {
 
   async function readJson(filename) {
     if (dataCache[filename]) return dataCache[filename];
-    if (!await ensureToken(onAuthFailure)) return {};
+    if (!await ensureToken(onAuthFailure)) return null;
     try {
       const fileId = await getFileId(filename);
-      if (!fileId) { dataCache[filename] = {}; return {}; }
+      if (!fileId) return null;
       const resp = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
         headers: { 'Authorization': `Bearer ${getAccessToken()}` }
       });
-      if (!resp.ok) { dataCache[filename] = {}; return {}; }
+      if (!resp.ok) return null;
       const data = await resp.json();
       dataCache[filename] = data;
       return data;
-    } catch(e) { return {}; }
+    } catch(e) { return null; }
   }
 
   async function writeJson(filename, data, onError) {
